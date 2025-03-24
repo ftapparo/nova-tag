@@ -1,4 +1,11 @@
+# Node.js dependencies
 node_modules/
+dist/
 logs/
 
+# Package lock file
+.lock
 package-lock.json
+
+# Env files
+.env
