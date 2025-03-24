@@ -27,7 +27,8 @@ const ANTENNAS: AntennaConfig[] = [
     }
 ];
 
-const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 1000;
+const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 10000; // 10s por padrão
+const HEALTHCHECK_TIMEOUT = HEALTHCHECK_INTERVAL * 10; // Se não houver resposta em 30s, reinicia a conexão
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 const HEALTHCHECK_CMD = Buffer.from("CFFF00720017A5", "hex");
@@ -35,8 +36,8 @@ const HEALTHCHECK_CMD = Buffer.from("CFFF00720017A5", "hex");
 const lastTagPerAntenna: Record<string, string | null> = {};
 const lastValidatedTags: Record<string, any> = {};
 const isRelayBusy: Record<string, boolean> = {};
-
-let interval = HEALTHCHECK_INTERVAL;
+const healthCheckTimers: Record<string, NodeJS.Timeout | null> = {};
+const healthCheckIntervals: Record<string, number> = {};
 
 function connectToAntenna(antenna: AntennaConfig) {
     const client = new net.Socket();
@@ -45,54 +46,39 @@ function connectToAntenna(antenna: AntennaConfig) {
     lastTagPerAntenna[antennaKey] = null;
     lastValidatedTags[antennaKey] = null;
     isRelayBusy[antennaKey] = false;
+    healthCheckTimers[antennaKey] = null;
+    healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL;
 
-    // Conecta à antena
     client.connect(antenna.port, antenna.ip, () => {
         logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip} | Porta: ${antenna.port} | Dispositivo: ${antenna.device}]`);
-
-        setInterval(() => {
-            client.write(HEALTHCHECK_CMD);
-            logger.debug(`[HEALTHCHECK] Solicitado [IP: ${antenna.ip}]`);
-            interval = HEALTHCHECK_INTERVAL;
-        }, interval);
+        sendHealthCheck(client, antennaKey);
     });
 
-    // Recebe dados da antena
     client.on("data", async (data) => {
         const hexData = data.toString("hex");
-        //logger.debug(`[RECEIVED] [${antenna.ip}] -> ${hexData}`);
 
         if (hexData.startsWith("cf000072")) {
-            logger.debug(`[HEALTHCHECK] Recebido [IP: ${antenna.ip} | Status OK]`);
+            logger.debug(`[HEALTHCHECK] Resposta da antena [${antenna.ip}]. Conexão estável.`);
+            resetHealthCheckTimer(client, antennaKey);
+            return;
         }
 
         if (hexData.startsWith("cf00000112")) {
             const tagNumber = "0" + hexData.slice(-13, -4);
-            const now = Date.now();
+            logger.info(`[READ] TAG ${tagNumber} na antena [${antenna.ip}]`);
 
-            logger.info(`[READ] TAG ${tagNumber} na antena [IP: ${antenna.ip} | Dispositivo: ${antenna.device}]`);
+            if (isRelayBusy[antennaKey]) return;
 
-            
-            if (isRelayBusy[antennaKey]) {
-                return
-            }
-
-            if(tagNumber === lastTagPerAntenna[antennaKey]){
-                logger.debug(`[INFO] TAG ${tagNumber} já validada, apenas abrindo portão.`);
+            if (tagNumber === lastTagPerAntenna[antennaKey]) {
+                logger.debug(`[INFO] TAG ${tagNumber} já validada. Apenas abrindo portão.`);
                 openGate(client, antennaKey, tagNumber);
                 return;
             }
 
             try {
-                // Valida a TAG apenas se for diferente da última lida
-                const validateData = {
-                    id: tagNumber,
-                    dispositivo: antenna.device,
-                    foto: null,
-                    sentido: antenna.direction
-                };
-
+                const validateData = { id: tagNumber, dispositivo: antenna.device, foto: null, sentido: antenna.direction };
                 const response = await axios.post("http://localhost:3000/access/verify", validateData);
+
                 if (response.data.status !== "success") {
                     logger.error(`[ERROR] Falha ao consultar acesso da TAG ${tagNumber}`);
                     return;
@@ -104,13 +90,11 @@ function connectToAntenna(antenna: AntennaConfig) {
                     return;
                 }
 
-                // Atualiza a última TAG validada e seus dados
                 lastTagPerAntenna[antennaKey] = tagNumber;
                 lastValidatedTags[antennaKey] = responseData;
-                
+
                 openGate(client, antennaKey, tagNumber);
 
-                // Dados para registro
                 const registerData = {
                     dispositivo: antenna.device,
                     pessoa: responseData.SEQPESSOA,
@@ -143,27 +127,41 @@ function connectToAntenna(antenna: AntennaConfig) {
         }
     });
 
-    // Eventos de desconexão e erro
     client.on("close", () => {
         logger.warn(`[DISCONNECTED] Antena [${antenna.ip}] desconectada. Tentando reconectar...`);
         setTimeout(() => connectToAntenna(antenna), 5000);
     });
 
-    // Evento de erro
     client.on("error", (err) => {
         logger.error(`[ERROR] Antena [${antenna.ip}]: ${err.message}`);
         client.destroy();
     });
 }
 
-// Função para abrir o portão
-function openGate(client: net.Socket, antennaKey: string, tagNumber: string) {
-    if (isRelayBusy[antennaKey]) {
-        logger.debug(`[INFO] TAG ${tagNumber} ignorada pois o portão ainda está aberto.`);
-        return;
+function sendHealthCheck(client: net.Socket, antennaKey: string) {
+    logger.debug(`[HEALTHCHECK] Enviando para antena [${antennaKey}]`);
+    client.write(HEALTHCHECK_CMD);
+
+    healthCheckTimers[antennaKey] = setTimeout(() => {
+        logger.error(`[ERROR] Antena ${antennaKey} não respondeu ao HealthCheck. Reiniciando conexão.`);
+        client.destroy();
+    }, HEALTHCHECK_TIMEOUT);
+
+    setTimeout(() => sendHealthCheck(client, antennaKey), healthCheckIntervals[antennaKey]);
+}
+
+function resetHealthCheckTimer(client: net.Socket, antennaKey: string) {
+    if (healthCheckTimers[antennaKey]) {
+        clearTimeout(healthCheckTimers[antennaKey]!);
     }
+}
+
+function openGate(client: net.Socket, antennaKey: string, tagNumber: string) {
+    if (isRelayBusy[antennaKey]) return;
 
     isRelayBusy[antennaKey] = true;
+    healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL * 5; // Aumenta o intervalo do HealthCheck
+
     logger.debug(`[COMMAND] Abrindo portão para TAG ${tagNumber}`);
     client.write(RELAY_OPEN_CMD);
 
@@ -171,6 +169,7 @@ function openGate(client: net.Socket, antennaKey: string, tagNumber: string) {
         logger.debug(`[COMMAND] Fechando portão para TAG ${tagNumber}`);
         client.write(RELAY_CLOSE_CMD);
         isRelayBusy[antennaKey] = false;
+        healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL; // Volta ao intervalo normal
     }, 2000);
 }
 
