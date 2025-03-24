@@ -52,7 +52,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 
         setInterval(() => {
             client.write(HEALTHCHECK_CMD);
-            //logger.debug(`[HEALTHCHECK] Solicitado [IP: ${antenna.ip}]`);
+            logger.debug(`[HEALTHCHECK] Solicitado [IP: ${antenna.ip}]`);
             interval = HEALTHCHECK_INTERVAL;
         }, interval);
     });
@@ -63,7 +63,7 @@ function connectToAntenna(antenna: AntennaConfig) {
         //logger.debug(`[RECEIVED] [${antenna.ip}] -> ${hexData}`);
 
         if (hexData.startsWith("cf000072")) {
-            //logger.debug(`[HEALTHCHECK] Recebido [IP: ${antenna.ip} | Status OK]`);
+            logger.debug(`[HEALTHCHECK] Recebido [IP: ${antenna.ip} | Status OK]`);
         }
 
         if (hexData.startsWith("cf00000112")) {
