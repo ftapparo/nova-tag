@@ -1,0 +1,27 @@
+{
+  "name": "nova-tag",
+  "version": "1.0.0",
+  "description": "Aplicação de conexção com a antena TAG.",
+  "license": "MIT",
+  "author": "Flavio Eduardo Tapparo",
+  "type": "commonjs",
+  "main": "server.ts",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+  },
+  "dependencies": {
+    "@logtail/node": "^0.5.2",
+    "@logtail/winston": "^0.5.2",
+    "@types/winston": "^2.4.4",
+    "axios": "^1.8.3",
+    "dotenv": "^16.4.7",
+    "net": "^1.0.2",
+    "node-firebird": "^1.1.9",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2",
+    "winston": "^3.17.0"
+  },
+  "devDependencies": {
+    "ts-node-dev": "^2.0.0"
+  }
+}
