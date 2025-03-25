@@ -12,7 +12,7 @@ const sendToBetterStack = async (level: string, message: string) => {
       await axios.post(
         process.env.BETTERSTACK_URL || "",
         {
-          dt: new Date().toISOString(),
+          dt: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }).replace(",", ""),
           level,
           message,
         },
@@ -29,10 +29,10 @@ const sendToBetterStack = async (level: string, message: string) => {
   }
 };
 
-// Função para formatar data e hora
+// Função para formatar data e hora corretamente
 const timestampFormat = winston.format((info) => {
-  const date = new Date().toISOString().replace("T", " ").replace("Z", "");
-  info.timestamp = `[${date}]`; // Exemplo: [2025-03-24 14:30:45.123]
+  const date = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }).replace(",", "");
+  info.timestamp = `[${date}]`; // Exemplo: [25/03/2025 14:30:45]
   return info;
 });
 
@@ -68,7 +68,7 @@ export const logger = winston.createLogger({
   transports: [
     new winston.transports.Console({ format: consoleFormat }), // Exibe TODOS os logs no console
     new DailyRotateFile({
-      filename: "logs/%DATE%.log", // Criará arquivos diários com o nome no formato "logs/24032025.log"
+      filename: "logs/%DATE%.log", // Criará arquivos diários com o nome no formato "logs/25032025.log"
       datePattern: "DDMMYYYY", // Formato da data para o nome do arquivo
       maxSize: "10m", // Limite de tamanho do arquivo antes de criar um novo
       maxFiles: "30d", // Mantém logs por 30 dias
