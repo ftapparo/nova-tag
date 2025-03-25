@@ -27,7 +27,7 @@ const ANTENNAS: AntennaConfig[] = [
     }
 ];
 
-const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 10000; // 10s por padrão
+const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 10000; // 10s padrão
 const HEALTHCHECK_TIMEOUT = HEALTHCHECK_INTERVAL * 10; // Se não houver resposta em 30s, reinicia a conexão
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
@@ -38,6 +38,7 @@ const lastValidatedTags: Record<string, any> = {};
 const isRelayBusy: Record<string, boolean> = {};
 const healthCheckTimers: Record<string, NodeJS.Timeout | null> = {};
 const healthCheckIntervals: Record<string, number> = {};
+const activeClients: Record<string, net.Socket | null> = {};
 
 function connectToAntenna(antenna: AntennaConfig) {
     const client = new net.Socket();
@@ -48,10 +49,11 @@ function connectToAntenna(antenna: AntennaConfig) {
     isRelayBusy[antennaKey] = false;
     healthCheckTimers[antennaKey] = null;
     healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL;
+    activeClients[antennaKey] = client;
 
     client.connect(antenna.port, antenna.ip, () => {
         logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip} | Porta: ${antenna.port} | Dispositivo: ${antenna.device}]`);
-        sendHealthCheck(client, antennaKey);
+        scheduleHealthCheck(client, antenna);
     });
 
     client.on("data", async (data) => {
@@ -129,7 +131,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 
     client.on("close", () => {
         logger.warn(`[DISCONNECTED] Antena [${antenna.ip}] desconectada. Tentando reconectar...`);
-        setTimeout(() => connectToAntenna(antenna), 5000);
+        setTimeout(() => connectToAntenna(antenna), 3000);
     });
 
     client.on("error", (err) => {
@@ -138,16 +140,26 @@ function connectToAntenna(antenna: AntennaConfig) {
     });
 }
 
-function sendHealthCheck(client: net.Socket, antennaKey: string) {
-    logger.debug(`[HEALTHCHECK] Enviando para antena [${antennaKey}]`);
+function scheduleHealthCheck(client: net.Socket, antenna: AntennaConfig) {
+    const antennaKey = `${antenna.device}`;
+
+    if (!activeClients[antennaKey] || activeClients[antennaKey] !== client) return;
+
+    logger.debug(`[HEALTHCHECK] Enviando para antena [${antenna.ip}]`);
     client.write(HEALTHCHECK_CMD);
 
     healthCheckTimers[antennaKey] = setTimeout(() => {
-        logger.error(`[ERROR] Antena ${antennaKey} não respondeu ao HealthCheck. Reiniciando conexão.`);
-        client.destroy();
+        logger.error(`[ERROR] Antena ${antenna.ip} não respondeu ao HealthCheck. Reiniciando conexão.`);
+        if (activeClients[antennaKey] === client) {
+            client.destroy();
+        }
     }, HEALTHCHECK_TIMEOUT);
 
-    setTimeout(() => sendHealthCheck(client, antennaKey), healthCheckIntervals[antennaKey]);
+    setTimeout(() => {
+        if (activeClients[antennaKey] === client) {
+            scheduleHealthCheck(client, antenna);
+        }
+    }, HEALTHCHECK_INTERVAL);
 }
 
 function resetHealthCheckTimer(client: net.Socket, antennaKey: string) {
@@ -160,7 +172,7 @@ function openGate(client: net.Socket, antennaKey: string, tagNumber: string) {
     if (isRelayBusy[antennaKey]) return;
 
     isRelayBusy[antennaKey] = true;
-    healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL * 5; // Aumenta o intervalo do HealthCheck
+    healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL * 5;
 
     logger.debug(`[COMMAND] Abrindo portão para TAG ${tagNumber}`);
     client.write(RELAY_OPEN_CMD);
@@ -169,14 +181,8 @@ function openGate(client: net.Socket, antennaKey: string, tagNumber: string) {
         logger.debug(`[COMMAND] Fechando portão para TAG ${tagNumber}`);
         client.write(RELAY_CLOSE_CMD);
         isRelayBusy[antennaKey] = false;
-        healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL; // Volta ao intervalo normal
+        healthCheckIntervals[antennaKey] = HEALTHCHECK_INTERVAL;
     }, 2000);
 }
 
-ANTENNAS.forEach((antenna) => {
-    if (antenna.ip && antenna.port) {
-        connectToAntenna(antenna);
-    } else {
-        logger.error(`[ERROR] Configuração inválida da antena: ${antenna.device}`);
-    }
-});
+ANTENNAS.forEach((antenna) => connectToAntenna(antenna));
