@@ -61,7 +61,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 
         if (hexData.startsWith("cf000072")) {
             logger.debug(`[HEALTHCHECK] Resposta da antena [${antenna.ip}]. Conexão estável.`);
-            resetHealthCheckTimer(client, antennaKey);
+            resetHealthCheckTimer(antennaKey);
             return;
         }
 
@@ -131,6 +131,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 
     client.on("close", () => {
         logger.warn(`[DISCONNECTED] Antena [${antenna.ip}] desconectada. Tentando reconectar...`);
+        resetHealthCheckTimer(antennaKey);
         setTimeout(() => connectToAntenna(antenna), 3000);
     });
 
@@ -149,8 +150,8 @@ function scheduleHealthCheck(client: net.Socket, antenna: AntennaConfig) {
     client.write(HEALTHCHECK_CMD);
 
     healthCheckTimers[antennaKey] = setTimeout(() => {
-        logger.error(`[ERROR] Antena ${antenna.ip} não respondeu ao HealthCheck. Reiniciando conexão.`);
         if (activeClients[antennaKey] === client) {
+            logger.error(`[ERROR] Antena ${antenna.ip} não respondeu ao HealthCheck. Reiniciando conexão.`);
             client.destroy();
         }
     }, HEALTHCHECK_TIMEOUT);
@@ -162,7 +163,7 @@ function scheduleHealthCheck(client: net.Socket, antenna: AntennaConfig) {
     }, HEALTHCHECK_INTERVAL);
 }
 
-function resetHealthCheckTimer(client: net.Socket, antennaKey: string) {
+function resetHealthCheckTimer(antennaKey: string) {
     if (healthCheckTimers[antennaKey]) {
         clearTimeout(healthCheckTimers[antennaKey]!);
     }
