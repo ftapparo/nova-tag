@@ -55,7 +55,7 @@ function connectToAntenna(antenna: AntennaConfig) {
   client.connect(antenna.port, antenna.ip, () => {
     waitHealthCheckResponse = false;
     client.setTimeout(HEALTHCHECK_TIMEOUT);
-    logger.info(`[CONECTADA] Antena RFID [IP: ${antenna.ip}]`);
+    logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip}]`);
   });
 
   client.on("data", async (data) => {
@@ -71,12 +71,12 @@ function connectToAntenna(antenna: AntennaConfig) {
     // Leitura de TAG válida
     if (hexData.startsWith("cf00000112")) {
       const tagNumber = "0" + hexData.slice(-13, -4);
-      logger.info(`[LEITURA] TAG ${tagNumber} detectada pela antena [${antenna.ip}]`);
+      logger.info(`[READ] TAG ${tagNumber} detectada pela antena [${antenna.ip}]`);
 
       // Ignora se a TAG já foi tratada recentemente
       if (lastTags.includes(tagNumber)) {
         if (isRelayBusy) return;
-        logger.debug(`[INFO] TAG ${tagNumber} já validada recentemente. Abrindo portão.`);
+        logger.debug(`[AUTHORIZED] TAG ${tagNumber} já validada recentemente. Abrindo portão.`);
         openGate(client, tagNumber);
         return;
       }
@@ -92,13 +92,13 @@ function connectToAntenna(antenna: AntennaConfig) {
 
         const response = await axios.post("http://localhost:3000/access/verify", validateData);
         if (response.data.status !== "success") {
-          logger.error(`[ERRO] Falha ao consultar acesso da TAG ${tagNumber}`);
+          logger.error(`[ERROR] Falha ao consultar acesso da TAG ${tagNumber}`);
           return;
         }
 
         const responseData = response.data.data;
         if (responseData.PERMITIDO.trim() !== "S") {
-          logger.warn(`[NÃO AUTORIZADA] TAG ${tagNumber} sem permissão de acesso.`);
+          logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} sem permissão de acesso.`);
           return;
         }
 
@@ -129,14 +129,14 @@ function connectToAntenna(antenna: AntennaConfig) {
         const regResponse = await axios.post("http://localhost:3000/access/register", registerData);
 
         if (regResponse.data.status !== "success") {
-          logger.error(`[ERRO] Falha ao registrar acesso da TAG ${tagNumber}`);
+          logger.error(`[ERROR] Falha ao registrar acesso da TAG ${tagNumber}`);
         } else {
           const timestamp = new Date().toTimeString().split(" ")[0];
           const sentido = antenna.direction === "S" ? "Saída" : "Entrada";
-          logger.info(`[REGISTRO] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp}), acesso registrado`);
+          logger.info(`[REGISTER] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp}), acesso registrado`);
         }
       } catch (error) {
-        logger.error(`[ERRO] Comunicação com API: ${error}`);
+        logger.error(`[ERROR] Comunicação com API: ${error}`);
       }
     }
   });
@@ -156,24 +156,24 @@ function connectToAntenna(antenna: AntennaConfig) {
       // Timeout adicional para aguardar resposta do healthcheck
       setTimeout(() => {
         if (waitHealthCheckResponse) {
-          logger.error(`[ERRO] Sem resposta ao HealthCheck. Reiniciando conexão com ${antenna.ip}`);
+          logger.error(`[ERROR] Sem resposta ao HealthCheck. Reiniciando conexão com ${antenna.ip}`);
           client.destroy();
         }
       }, 3000);
     } catch (e) {
-      logger.error(`[ERRO] Falha ao enviar HealthCheck: ${e}`);
+      logger.error(`[ERROR] Falha ao enviar HealthCheck: ${e}`);
       client.destroy();
     }
   });
 
   client.on("close", () => {
     waitHealthCheckResponse = false;
-    logger.warn(`[DESCONECTADA] Antena [${antenna.ip}]. Tentando reconectar...`);
+    logger.warn(`[DISCONNECTED] Antena [${antenna.ip}]. Tentando reconectar...`);
     setTimeout(() => connectToAntenna(antenna), 3000);
   });
 
   client.on("error", (err) => {
-    logger.error(`[ERRO] Antena [${antenna.ip}]: ${err.message}`);
+    logger.error(`[ERROR] Antena [${antenna.ip}]: ${err.message}`);
     client.destroy();
   });
 }
@@ -184,11 +184,11 @@ function openGate(client: net.Socket, tagNumber: string) {
 
   isRelayBusy = true;
 
-  logger.debug(`[COMANDO] Abrindo portão - TAG ${tagNumber}`);
+  logger.debug(`[COMMAND] Abrindo portão - TAG ${tagNumber}`);
   client.write(RELAY_OPEN_CMD);
 
   setTimeout(() => {
-    logger.debug(`[COMANDO] Fechando portão - TAG ${tagNumber}`);
+    logger.debug(`[COMMAND] Fechando portão - TAG ${tagNumber}`);
     client.write(RELAY_CLOSE_CMD);
     isRelayBusy = false;
   }, 2000);
