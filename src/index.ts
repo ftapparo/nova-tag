@@ -10,6 +10,13 @@ interface AntennaConfig {
   direction: string;
 }
 
+enum GateState {
+  CLOSED = "fechado",
+  OPENING = "abrindo",
+  OPEN = "aberto",
+  CLOSING = "fechando"
+}
+
 dotenv.config();
 
 // Define qual antena será utilizada (TAG1 ou TAG2)
@@ -39,22 +46,28 @@ if (selectedAntenna === "TAG1") {
 }
 
 // Constantes
-const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_INTERVAL) || 10000;
-const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
+const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 60000;
+const GATE_CLOSE_TIMEOUT = Number(process.env.GATE_CLOSE_TIMEOUT) || 3000;
+const GATE_OPEN_TIMEOUT = Number(process.env.GATE_OPEN_TIMEOUT) || 10000;
+const RELAY_OPEN_CMD = Buffer.from("CFFF00770202005D26", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
 
 // Variáveis de controle
-let lastTags: string[] = []; // Armazena as 3 últimas TAGs lidas
-let isRelayBusy = false;     // Evita reabrir o portão durante o ciclo
-let waitHealthCheckResponse = false; // Controla se está aguardando resposta do healthcheck
+let lastTags: string[] = []; 
+let isRelayBusy = false;  
+let waitHealthCheckResponse = false; 
+let currentTagOpen: string | null = null; 
+let tagCloseTimer: NodeJS.Timeout | null = null;
+let pulseTimeout: NodeJS.Timeout | null = null;
+let gateState: GateState = GateState.CLOSED;
 
 function connectToAntenna(antenna: AntennaConfig) {
   const client = new net.Socket();
 
   client.connect(antenna.port, antenna.ip, () => {
     waitHealthCheckResponse = false;
-    client.setTimeout(HEALTHCHECK_TIMEOUT);
+    client.setTimeout(HEALTHCHECK_INTERVAL);
     logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip}]`);
   });
 
@@ -75,8 +88,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 
       // Ignora se a TAG já foi tratada recentemente
       if (lastTags.includes(tagNumber)) {
-        if (isRelayBusy) return;
-        logger.debug(`[AUTHORIZED] TAG ${tagNumber} já validada recentemente. Abrindo portão.`);
+        logger.debug(`[AUTHORIZED] TAG ${tagNumber} já validada.`);
         openGate(client, tagNumber);
         return;
       }
@@ -178,21 +190,74 @@ function connectToAntenna(antenna: AntennaConfig) {
   });
 }
 
-// Abre o portão e fecha após 2 segundos
+// Abre o portão e fecha após 3 segundos
 function openGate(client: net.Socket, tagNumber: string) {
-  if (isRelayBusy) return;
+  
+  if (isRelayBusy && tagNumber === currentTagOpen) {
+    logger.debug(`[STATE] Portão ${gateState} - TAG ${tagNumber}`);
+    resetCloseTimer(client, tagNumber);
+    return;
+  }
 
+  if (isRelayBusy && tagNumber !== currentTagOpen) {
+    
+    client.write(RELAY_CLOSE_CMD);
+    gateState = GateState.CLOSING;
+
+    logger.debug(`[STATE] Pulso de fechamento - TAG anterior: ${currentTagOpen}, nova TAG: ${tagNumber}`);
+
+    if (pulseTimeout) clearTimeout(pulseTimeout);
+
+    pulseTimeout = setTimeout(() => {
+      currentTagOpen = tagNumber;
+
+      logger.debug(`[COMMAND] Comando de abertura - TAG ${tagNumber}`);
+      client.write(RELAY_OPEN_CMD);
+
+      gateState = GateState.OPENING;
+      resetCloseTimer(client, tagNumber);
+      pulseTimeout = null;
+    }, 500);
+    
+    return;
+  }
+
+  // Primeiro acionamento
   isRelayBusy = true;
+  currentTagOpen = tagNumber;
 
-  logger.debug(`[COMMAND] Abrindo portão - TAG ${tagNumber}`);
+  const estimatedOpenTime =
+    gateState === GateState.CLOSING ? (GATE_OPEN_TIMEOUT / 2) : GATE_OPEN_TIMEOUT;
+
+  logger.debug(`[COMMAND] Abrindo (${estimatedOpenTime}ms) - TAG ${tagNumber}`);
   client.write(RELAY_OPEN_CMD);
 
+  gateState = GateState.OPENING;
+
   setTimeout(() => {
-    logger.debug(`[COMMAND] Fechando portão - TAG ${tagNumber}`);
-    client.write(RELAY_CLOSE_CMD);
-    isRelayBusy = false;
-  }, 2000);
+    gateState = GateState.OPEN;
+    logger.debug(`[STATE] Portão totalmente aberto - TAG ${tagNumber}`);
+    resetCloseTimer(client, tagNumber);
+  }, estimatedOpenTime);
 }
+
+
+function resetCloseTimer(client: net.Socket, tagNumber: string) {
+  if (gateState !== GateState.OPEN) return;
+
+  if (tagCloseTimer) clearTimeout(tagCloseTimer);
+
+  tagCloseTimer = setTimeout(() => {
+    logger.debug(`[COMMAND] Comando de fechamento - TAG ${tagNumber}`);
+    client.write(RELAY_CLOSE_CMD);
+
+    gateState = GateState.CLOSING;
+    isRelayBusy = false;
+    currentTagOpen = null;
+    tagCloseTimer = null;
+  }, GATE_CLOSE_TIMEOUT);
+}
+
 
 // Inicia conexão com a antena
 connectToAntenna(antenna);
