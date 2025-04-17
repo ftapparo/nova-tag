@@ -11,10 +11,10 @@ interface AntennaConfig {
 }
 
 enum GateState {
-  CLOSED = "fechado",
-  OPENING = "abrindo",
-  OPEN = "aberto",
-  CLOSING = "fechando"
+  CLOSED,
+  OPENING,
+  OPEN,
+  CLOSING,
 }
 
 dotenv.config();
@@ -71,8 +71,32 @@ function connectToAntenna(antenna: AntennaConfig) {
   client.connect(antenna.port, antenna.ip, () => {
     waitHealthCheckResponse = false;
     client.setTimeout(HEALTHCHECK_INTERVAL);
+
     logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip}]`);
+
+    // Força sincronização com o hardware
+    client.write(RELAY_CLOSE_CMD);
+
+    // Reinicia todas as variáveis de controle
+    gateState = GateState.CLOSED;
+    isRelayBusy = false;
+    currentTagOpen = null;
+
+    if (tagCloseTimer) {
+      clearTimeout(tagCloseTimer);
+      tagCloseTimer = null;
+    }
+
+    if (pulseTimeout) {
+      clearTimeout(pulseTimeout);
+      pulseTimeout = null;
+    }
+
+    lastTags = [];
+
+    logger.warn(`[SYNC] Reset interno realizado e comando de fechamento enviado`);
   });
+
 
   client.on("data", async (data) => {
     const hexData = data.toString("hex");
@@ -87,71 +111,17 @@ function connectToAntenna(antenna: AntennaConfig) {
     // Leitura de TAG válida
     if (hexData.startsWith("cf00000112")) {
       const tagNumber = "0" + hexData.slice(-13, -4);
-      logger.info(`[READ] TAG ${tagNumber} detectada pela antena [${antenna.ip}]`);
-
-      // Ignora se a TAG já foi tratada recentemente
+      
+      // Se a TAG já foi tratada recentemente
       if (lastTags.includes(tagNumber)) {
         logger.debug(`[AUTHORIZED] TAG ${tagNumber} já validada.`);
         openGate(client, tagNumber);
         return;
       }
-
-      try {
-        // Validação da TAG via API
-        const validateData = {
-          id: tagNumber,
-          dispositivo: antenna.device,
-          foto: null,
-          sentido: antenna.direction,
-        };
-
-        const response = await axios.post("http://localhost:3000/access/verify", validateData);
-        if (response.data.status !== "success") {
-          logger.error(`[ERROR] Falha ao consultar acesso da TAG ${tagNumber}`);
-          return;
-        }
-
-        const responseData = response.data.data;
-        if (responseData.PERMITIDO.trim() !== "S") {
-          logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} sem permissão de acesso.`);
-          return;
-        }
-
-        // Atualiza lista das últimas TAGs lidas
-        lastTags.unshift(tagNumber);
-        if (lastTags.length > 3) lastTags.pop();
-
-        openGate(client, tagNumber);
-
-        // Registro do acesso
-        const registerData = {
-          dispositivo: antenna.device,
-          pessoa: responseData.SEQPESSOA,
-          classificacao: responseData.SEQCLASSIFICACAO,
-          classAutorizado: responseData.CLASSIFAUTORIZADA.trim(),
-          autorizacaoLanc: responseData.AUTORIZACAOLANC.trim(),
-          origem: responseData.TIPO.trim(),
-          seqIdAcesso: responseData.SEQIDACESSO,
-          sentido: antenna.direction.trim(),
-          quadra: responseData.QUADRA.trim(),
-          lote: responseData.LOTE.trim(),
-          panico: responseData.PANICO.trim(),
-          formaAcesso: responseData.MIDIA.trim(),
-          idAcesso: responseData.IDENT.trim(),
-          seqVeiculo: responseData.SEQVEICULO,
-        };
-
-        const regResponse = await axios.post("http://localhost:3000/access/register", registerData);
-
-        if (regResponse.data.status !== "success") {
-          logger.error(`[ERROR] Falha ao registrar acesso da TAG ${tagNumber}`);
-        } else {
-          const timestamp = new Date().toTimeString().split(" ")[0];
-          const sentido = antenna.direction === "S" ? "Saída" : "Entrada";
-          logger.info(`[REGISTER] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp}), acesso registrado`);
-        }
-      } catch (error) {
-        logger.error(`[ERROR] Comunicação com API: ${error}`);
+      else { 
+        logger.info(`[READ] TAG ${tagNumber}`);
+        validateTag(client, tagNumber);
+        return;
       }
     }
   });
@@ -193,55 +163,127 @@ function connectToAntenna(antenna: AntennaConfig) {
   });
 }
 
+async function validateTag(client: net.Socket, tagNumber: string) {
+
+  try {
+    // Validação da TAG via API
+    const validateData = {
+      id: tagNumber,
+      dispositivo: antenna.device,
+      foto: null,
+      sentido: antenna.direction,
+    };
+
+    const response = await axios.post("http://localhost:3000/access/verify", validateData);
+    if (response.data.status !== "success") {
+      logger.error(`[ERROR] Falha ao consultar TAG ${tagNumber}`);
+      return;
+    }
+
+    const responseData = response.data.data;
+    if (responseData.PERMITIDO.trim() !== "S") {
+      logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} sem permissão`);
+      return;
+    }
+
+    // Atualiza lista das últimas TAGs lidas
+    lastTags.unshift(tagNumber);
+    if (lastTags.length > 3) lastTags.pop();
+
+    openGate(client, tagNumber);
+
+    // Registro do acesso
+    const registerData = {
+      dispositivo: antenna.device,
+      pessoa: responseData.SEQPESSOA,
+      classificacao: responseData.SEQCLASSIFICACAO,
+      classAutorizado: responseData.CLASSIFAUTORIZADA.trim(),
+      autorizacaoLanc: responseData.AUTORIZACAOLANC.trim(),
+      origem: responseData.TIPO.trim(),
+      seqIdAcesso: responseData.SEQIDACESSO,
+      sentido: antenna.direction.trim(),
+      quadra: responseData.QUADRA.trim(),
+      lote: responseData.LOTE.trim(),
+      panico: responseData.PANICO.trim(),
+      formaAcesso: responseData.MIDIA.trim(),
+      idAcesso: responseData.IDENT.trim(),
+      seqVeiculo: responseData.SEQVEICULO,
+    };
+
+    const regResponse = await axios.post("http://localhost:3000/access/register", registerData);
+
+    if (regResponse.data.status !== "success") {
+      logger.error(`[ERROR] Falha ao registrar acesso - TAG ${tagNumber}`);
+    } else {
+      const timestamp = new Date().toTimeString().split(" ")[0];
+      const sentido = antenna.direction === "S" ? "Saída" : "Entrada";
+      logger.info(`[REGISTER] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp}), acesso registrado`);
+    }
+  } catch (error) {
+    logger.error(`[ERROR] Comunicação com API: ${error}`);
+  }
+}
+
+
 // Abre o portão e fecha após 3 segundos
 function openGate(client: net.Socket, tagNumber: string) {
-  
-  if (isRelayBusy && tagNumber === currentTagOpen) {
-    logger.debug(`[STATE] Portão ${gateState} - TAG ${tagNumber}`);
-    resetCloseTimer(client, tagNumber);
-    return;
-  }
+   
+  if (gateState === GateState.OPENING || gateState === GateState.OPEN) {
 
-  if (isRelayBusy && tagNumber !== currentTagOpen) {
-    
-    client.write(RELAY_CLOSE_CMD);
-    gateState = GateState.CLOSING;
-
-    logger.debug(`[STATE] Pulso de fechamento - TAG anterior: ${currentTagOpen}, nova TAG: ${tagNumber}`);
-
-    if (pulseTimeout) clearTimeout(pulseTimeout);
-
-    pulseTimeout = setTimeout(() => {
-      currentTagOpen = tagNumber;
-
-      logger.debug(`[COMMAND] Comando de abertura - TAG ${tagNumber}`);
-      client.write(RELAY_OPEN_CMD);
-
-      gateState = GateState.OPENING;
+    if (tagNumber === currentTagOpen) {
+      logger.debug(`[STATE] Portão aberto`);
       resetCloseTimer(client, tagNumber);
-      pulseTimeout = null;
-    }, 500);
-    
+    }
+    else {
+      logger.debug(`[COMMAND] Comando de fechamento - TAG ${currentTagOpen}`);
+      client.write(RELAY_CLOSE_CMD);
+
+      if (pulseTimeout) { clearTimeout(pulseTimeout); pulseTimeout = null; }
+      if (tagCloseTimer) { clearTimeout(tagCloseTimer); tagCloseTimer = null; }
+
+      pulseTimeout = setTimeout(() => {
+        
+        logger.debug(`[COMMAND] Comando de abertura - TAG ${tagNumber}`);
+        client.write(RELAY_OPEN_CMD);
+
+        logger.debug(`[STATE] Portão aberto`);
+        gateState = GateState.OPEN;
+
+        currentTagOpen = tagNumber;
+        pulseTimeout = null;
+
+        resetCloseTimer(client, tagNumber);
+      }, 500);
+    }
+
     return;
   }
+  else if (gateState === GateState.CLOSING) {
 
-  // Primeiro acionamento
-  isRelayBusy = true;
-  currentTagOpen = tagNumber;
+    logger.debug(`[COMMAND] Comando de abertura - TAG ${tagNumber}`);
+    client.write(RELAY_OPEN_CMD);
 
-  const estimatedOpenTime =
-    gateState === GateState.CLOSING ? (GATE_OPENING_TIME / 2) : GATE_OPENING_TIME;
-
-  logger.debug(`[COMMAND] Abrindo (${estimatedOpenTime}ms) - TAG ${tagNumber}`);
-  client.write(RELAY_OPEN_CMD);
-
-  gateState = GateState.OPENING;
-
-  setTimeout(() => {
+    logger.debug(`[STATE] Portão aberto`);
     gateState = GateState.OPEN;
-    logger.debug(`[STATE] Portão totalmente aberto - TAG ${tagNumber}`);
-    resetCloseTimer(client, tagNumber);
-  }, estimatedOpenTime);
+    
+  }
+  else if (gateState === GateState.CLOSED) {
+
+    logger.debug(`[COMMAND] Comando de abertura (${GATE_OPENING_TIME}ms) - TAG ${tagNumber}`);
+    client.write(RELAY_OPEN_CMD);
+
+    logger.debug(`[STATE] Portão abrindo`);
+    gateState = GateState.OPENING;
+
+    setTimeout(() => {
+      logger.debug(`[STATE] Portão aberto`);
+      gateState = GateState.OPEN;
+
+      resetCloseTimer(client, tagNumber);
+    }, GATE_OPENING_TIME);
+  }
+
+  currentTagOpen = tagNumber;
 }
 
 
@@ -249,17 +291,18 @@ function resetCloseTimer(client: net.Socket, tagNumber: string) {
   if (gateState !== GateState.OPEN) return;
 
   if (tagCloseTimer) clearTimeout(tagCloseTimer);
-
+  
   tagCloseTimer = setTimeout(() => {
     logger.debug(`[COMMAND] Comando de fechamento - TAG ${tagNumber}`);
     client.write(RELAY_CLOSE_CMD);
 
     gateState = GateState.CLOSING;
+    logger.debug(`[STATE] Portão fechando`);
+
     isRelayBusy = false;
     currentTagOpen = null;
     tagCloseTimer = null;
 
-    // Aguarda o tempo de fechamento para considerar fechado
     setTimeout(() => {
       if (gateState === GateState.CLOSING) {
         gateState = GateState.CLOSED;
