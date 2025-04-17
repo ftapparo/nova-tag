@@ -80,7 +80,7 @@ export const logger = winston.createLogger({
       maxSize: "10m",
       maxFiles: "30d",
       format: fileFormat,
-      level: "info",
+      level: "debug",
     }),
   ],
 });
