@@ -47,8 +47,11 @@ if (selectedAntenna === "TAG1") {
 
 // Constantes
 const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 60000;
-const GATE_CLOSE_TIMEOUT = Number(process.env.GATE_CLOSE_TIMEOUT) || 3000;
-const GATE_OPEN_TIMEOUT = Number(process.env.GATE_OPEN_TIMEOUT) || 10000;
+
+const GATE_TIMEOUT_TO_CLOSE= Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 6000;
+const GATE_CLOSING_TIME= Number(process.env.GATE_CLOSING_TIME) || 10000;
+const GATE_OPENING_TIME= Number(process.env.GATE_OPENING_TIME) || 10000;
+
 const RELAY_OPEN_CMD = Buffer.from("CFFF00770202005D26", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
@@ -227,7 +230,7 @@ function openGate(client: net.Socket, tagNumber: string) {
   currentTagOpen = tagNumber;
 
   const estimatedOpenTime =
-    gateState === GateState.CLOSING ? (GATE_OPEN_TIMEOUT / 2) : GATE_OPEN_TIMEOUT;
+    gateState === GateState.CLOSING ? (GATE_OPENING_TIME / 2) : GATE_OPENING_TIME;
 
   logger.debug(`[COMMAND] Abrindo (${estimatedOpenTime}ms) - TAG ${tagNumber}`);
   client.write(RELAY_OPEN_CMD);
@@ -255,7 +258,16 @@ function resetCloseTimer(client: net.Socket, tagNumber: string) {
     isRelayBusy = false;
     currentTagOpen = null;
     tagCloseTimer = null;
-  }, GATE_CLOSE_TIMEOUT);
+
+    // Aguarda o tempo de fechamento para considerar fechado
+    setTimeout(() => {
+      if (gateState === GateState.CLOSING) {
+        gateState = GateState.CLOSED;
+        logger.debug(`[STATE] Portão totalmente fechado`);
+      }
+    }, GATE_CLOSING_TIME);
+    
+  }, GATE_TIMEOUT_TO_CLOSE);
 }
 
 
