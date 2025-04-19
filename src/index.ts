@@ -10,6 +10,14 @@ interface AntennaConfig {
   direction: string;
 }
 
+enum GateState {
+  CLOSED,
+  OPENING,
+  OPEN,
+  CLOSING,
+}
+
+
 dotenv.config();
 
 // Define qual antena será utilizada (TAG1 ou TAG2)
@@ -39,23 +47,42 @@ if (selectedAntenna === "TAG1") {
 }
 
 // Constantes
-const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_INTERVAL) || 10000;
+const HEALTHCHECK_INTERVAL = Number(process.env.HEALTHCHECK_INTERVAL) || 10000;
+const GATE_TIMEOUT_TO_CLOSE= Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 6000;
+
+// Buffers de comandos
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
 
 // Variáveis de controle
-let lastTags: string[] = []; // Armazena as 3 últimas TAGs lidas
-let isRelayBusy = false;     // Evita reabrir o portão durante o ciclo
-let waitHealthCheckResponse = false; // Controla se está aguardando resposta do healthcheck
+let lastTags: string[] = [];   
+let waitHealthCheckResponse = false;
+let gateState: GateState = GateState.CLOSED;
+let tagCloseTimer: NodeJS.Timeout | null = null;
 
 function connectToAntenna(antenna: AntennaConfig) {
   const client = new net.Socket();
 
   client.connect(antenna.port, antenna.ip, () => {
+
+    // Reinicia todas as variáveis de controle
+    lastTags = [];
     waitHealthCheckResponse = false;
-    client.setTimeout(HEALTHCHECK_TIMEOUT);
+    gateState = GateState.CLOSED;
+
+    if (tagCloseTimer) {
+      clearTimeout(tagCloseTimer);
+      tagCloseTimer = null;
+    }
+
+    client.setTimeout(HEALTHCHECK_INTERVAL);
+
     logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip}]`);
+
+    // Força sincronização com o hardware
+    client.write(RELAY_CLOSE_CMD);
+    logger.warn(`[SYNC] Reset interno realizado e comando de fechamento enviado`);
   });
 
   client.on("data", async (data) => {
@@ -71,72 +98,17 @@ function connectToAntenna(antenna: AntennaConfig) {
     // Leitura de TAG válida
     if (hexData.startsWith("cf00000112")) {
       const tagNumber = "0" + hexData.slice(-13, -4);
-      logger.info(`[READ] TAG ${tagNumber} detectada pela antena [${antenna.ip}]`);
 
       // Ignora se a TAG já foi tratada recentemente
       if (lastTags.includes(tagNumber)) {
-        if (isRelayBusy) return;
-        logger.debug(`[AUTHORIZED] TAG ${tagNumber} já validada recentemente. Abrindo portão.`);
+        logger.debug(`[AUTHORIZED] TAG ${tagNumber} já validada.`);
         openGate(client, tagNumber);
         return;
       }
-
-      try {
-        // Validação da TAG via API
-        const validateData = {
-          id: tagNumber,
-          dispositivo: antenna.device,
-          foto: null,
-          sentido: antenna.direction,
-        };
-
-        const response = await axios.post("http://localhost:3000/access/verify", validateData);
-        if (response.data.status !== "success") {
-          logger.error(`[ERROR] Falha ao consultar acesso da TAG ${tagNumber}`);
-          return;
-        }
-
-        const responseData = response.data.data;
-        if (responseData.PERMITIDO.trim() !== "S") {
-          logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} sem permissão de acesso.`);
-          return;
-        }
-
-        // Atualiza lista das últimas TAGs lidas
-        lastTags.unshift(tagNumber);
-        if (lastTags.length > 3) lastTags.pop();
-
-        openGate(client, tagNumber);
-
-        // Registro do acesso
-        const registerData = {
-          dispositivo: antenna.device,
-          pessoa: responseData.SEQPESSOA,
-          classificacao: responseData.SEQCLASSIFICACAO,
-          classAutorizado: responseData.CLASSIFAUTORIZADA.trim(),
-          autorizacaoLanc: responseData.AUTORIZACAOLANC.trim(),
-          origem: responseData.TIPO.trim(),
-          seqIdAcesso: responseData.SEQIDACESSO,
-          sentido: antenna.direction.trim(),
-          quadra: responseData.QUADRA.trim(),
-          lote: responseData.LOTE.trim(),
-          panico: responseData.PANICO.trim(),
-          formaAcesso: responseData.MIDIA.trim(),
-          idAcesso: responseData.IDENT.trim(),
-          seqVeiculo: responseData.SEQVEICULO,
-        };
-
-        const regResponse = await axios.post("http://localhost:3000/access/register", registerData);
-
-        if (regResponse.data.status !== "success") {
-          logger.error(`[ERROR] Falha ao registrar acesso da TAG ${tagNumber}`);
-        } else {
-          const timestamp = new Date().toTimeString().split(" ")[0];
-          const sentido = antenna.direction === "S" ? "Saída" : "Entrada";
-          logger.info(`[REGISTER] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp}), acesso registrado`);
-        }
-      } catch (error) {
-        logger.error(`[ERROR] Comunicação com API: ${error}`);
+      else { 
+        logger.info(`[READ] TAG ${tagNumber}`);
+        validateTag(client, tagNumber);
+        return;
       }
     }
   });
@@ -178,21 +150,98 @@ function connectToAntenna(antenna: AntennaConfig) {
   });
 }
 
+// Validação da TAG via API
+async function validateTag(client: net.Socket, tagNumber: string) {
+
+  try {
+    const validateData = {
+      id: tagNumber,
+      dispositivo: antenna.device,
+      foto: null,
+      sentido: antenna.direction,
+    };
+
+    const response = await axios.post("http://localhost:3000/access/verify", validateData);
+    if (response.data.status !== "success") {
+      logger.error(`[ERROR] Falha ao consultar TAG ${tagNumber}`);
+      return;
+    }
+
+    const responseData = response.data.data;
+    if (responseData.PERMITIDO.trim() !== "S") {
+      logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} sem permissão`);
+      return;
+    }
+
+    // Atualiza lista das últimas TAGs lidas
+    lastTags.unshift(tagNumber);
+    if (lastTags.length > 3) lastTags.pop();
+
+    openGate(client, tagNumber);
+
+    // Registro do acesso
+    const registerData = {
+      dispositivo: antenna.device,
+      pessoa: responseData.SEQPESSOA,
+      classificacao: responseData.SEQCLASSIFICACAO,
+      classAutorizado: responseData.CLASSIFAUTORIZADA.trim(),
+      autorizacaoLanc: responseData.AUTORIZACAOLANC.trim(),
+      origem: responseData.TIPO.trim(),
+      seqIdAcesso: responseData.SEQIDACESSO,
+      sentido: antenna.direction.trim(),
+      quadra: responseData.QUADRA.trim(),
+      lote: responseData.LOTE.trim(),
+      panico: responseData.PANICO.trim(),
+      formaAcesso: responseData.MIDIA.trim(),
+      idAcesso: responseData.IDENT.trim(),
+      seqVeiculo: responseData.SEQVEICULO,
+    };
+
+    const regResponse = await axios.post("http://localhost:3000/access/register", registerData);
+
+    if (regResponse.data.status !== "success") {
+      logger.error(`[ERROR] Falha ao registrar acesso - TAG ${tagNumber}`);
+    } else {
+      const timestamp = new Date().toTimeString().split(" ")[0];
+      const sentido = antenna.direction === "S" ? "Saída" : "Entrada";
+      logger.info(`[REGISTER] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp}), acesso registrado`);
+    }
+  } catch (error) {
+    logger.error(`[ERROR] Comunicação com API: ${error}`);
+  }
+}
+
 // Abre o portão e fecha após 2 segundos
 function openGate(client: net.Socket, tagNumber: string) {
-  if (isRelayBusy) return;
-
-  isRelayBusy = true;
-
-  logger.debug(`[COMMAND] Abrindo portão - TAG ${tagNumber}`);
-  client.write(RELAY_OPEN_CMD);
-
-  setTimeout(() => {
-    logger.debug(`[COMMAND] Fechando portão - TAG ${tagNumber}`);
-    client.write(RELAY_CLOSE_CMD);
-    isRelayBusy = false;
-  }, 2000);
+  if (gateState === GateState.CLOSED ){
+    logger.debug(`[COMMAND] Abrindo portão - TAG ${tagNumber}`);
+    client.write(RELAY_OPEN_CMD);
+    gateState = GateState.OPEN;
+  }
+  else {
+    logger.debug(`[STATE] Portão aberto`);
+  }
+  resetCloseTimer(client, tagNumber);
 }
+
+function resetCloseTimer(client: net.Socket, tagNumber: string) {
+  if (gateState === GateState.OPEN){
+    
+    if (tagCloseTimer) clearTimeout(tagCloseTimer);
+  
+    tagCloseTimer = setTimeout(() => {
+      logger.debug(`[COMMAND] Comando de fechamento - TAG ${tagNumber}`);
+      client.write(RELAY_CLOSE_CMD);
+  
+      gateState = GateState.CLOSED;
+      logger.debug(`[STATE] Portão fechando`);
+  
+      tagCloseTimer = null;
+  
+    }, GATE_TIMEOUT_TO_CLOSE);
+  }
+}
+
 
 // Inicia conexão com a antena
 connectToAntenna(antenna);
