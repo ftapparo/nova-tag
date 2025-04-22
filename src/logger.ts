@@ -1,49 +1,24 @@
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import dotenv from "dotenv";
-import axios from "axios";
 import path from "path";
+import dotenv from "dotenv";
+import io from "@pm2/io";
 
 dotenv.config();
 
-// Captura o argumento passado (ex: "TAG1" ou "TAG2")
 const instanceName = process.argv[2] || "DEFAULT";
-
-// Caminho do diretório de logs
 const logDir = path.join("logs", instanceName.toUpperCase());
 
-// Função para enviar logs ao Better Stack
-const sendToBetterStack = async (level: string, message: string) => {
-  try {
-    if (["info", "warn", "error"].includes(level)) {
-      await axios.post(
-        process.env.BETTERSTACK_URL || "",
-        {
-          dt: new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }).replace(",", ""),
-          level,
-          message,
-        },
-        {
-          headers: {
-            Authorization: `Bearer ${process.env.BETTERSTACK_API_KEY}`,
-            "Content-Type": "application/json",
-          },
-        }
-      );
-    }
-  } catch (error) {
-    console.error("Erro ao enviar log para Better Stack:", error);
-  }
-};
-
-// Formata a data/hora para logs
+// Timestamp customizado
 const timestampFormat = winston.format((info) => {
-  const date = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" }).replace(",", "");
+  const date = new Date().toLocaleString("pt-BR", {
+    timeZone: "America/Sao_Paulo",
+  }).replace(",", "");
   info.timestamp = `[${date}]`;
   return info;
 });
 
-// Cores para o console
+// Cores para console
 winston.addColors({
   info: "cyan",
   warn: "yellow",
@@ -51,7 +26,6 @@ winston.addColors({
   debug: "white",
 });
 
-// Console formatado
 const consoleFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   timestampFormat(),
@@ -60,7 +34,6 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Arquivos formatados
 const fileFormat = winston.format.combine(
   timestampFormat(),
   winston.format.printf(({ timestamp, level, message }) => {
@@ -68,8 +41,8 @@ const fileFormat = winston.format.combine(
   })
 );
 
-// Logger
-export const logger = winston.createLogger({
+// Logger base
+const baseLogger = winston.createLogger({
   level: "debug",
   format: winston.format.combine(winston.format.json()),
   transports: [
@@ -85,11 +58,42 @@ export const logger = winston.createLogger({
   ],
 });
 
-// Envia automaticamente para o Better Stack
-// logger.on("data", (log) => {
-//   if (["info", "warn", "error"].includes(log.level)) {
-//     sendToBetterStack(log.level, log.message);
-//   }
-// });
+// Mapa para métricas únicas
+const metricsMap: Record<string, ReturnType<typeof io.metric>> = {};
 
-export default logger;
+// Criação do logger com funções adicionais
+const proxyLogger = {
+  ...baseLogger,
+
+  /**
+   * Envia uma métrica para o PM2+
+   * @param name Nome da métrica
+   * @param value Valor da métrica
+   */
+  metric(name: string, value: string | number) {
+    if (!metricsMap[name]) {
+      metricsMap[name] = io.metric({ name });
+    }
+    metricsMap[name].set(value);
+  },
+
+  /**
+   * Envia uma issue (erro crítico) para o PM2+
+   * @param error Mensagem de erro ou Error
+   * @param context Objeto adicional com contexto
+   */
+  issue(error: string | Error, context: Record<string, any> = {}) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    io.notifyError(err, { custom: context });
+  },
+
+  /**
+   * Wrapper para logger.error que também envia issue para o PM2+
+   */
+  error(message: string, ...args: any[]) {
+    baseLogger.error(message, ...args);
+    this.issue(message);
+  },
+};
+
+export default proxyLogger;
