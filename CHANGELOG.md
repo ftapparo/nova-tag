@@ -2,6 +2,20 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [1.0.5] - 2025-04-23
+### Adicionado
+- Implementado temporizador global para fechamento automático do portão (`GATE_TIMEOUT_TO_CLOSE`).
+- Portão agora é fechado automaticamente após um tempo definido, com reinício do contador ao ler a mesma TAG novamente.
+- Adicionadas novas métricas: `OPEN_GATE`, `CLOSE_GATE`, `AUTHORIZED`.
+
+### Corrigido
+- Resposta da antena para comando de fechamento agora verifica `cf000077020001` como retorno válido.
+- Timeout de healthcheck não interfere mais no fechamento do portão em andamento.
+
+### Melhorado
+- Organização do reset do temporizador `closeGateTimeout` para evitar múltiplas execuções concorrentes.
+- Comentários adicionais no código para facilitar manutenção e entendimento futuro.
+
 ## [1.0.4] - 2025-04-22
 ### Adicionado
 - Envio de métricas para o PM2+ com `logger.metric("LAST_TAG_READED", tagNumber)`.

@@ -62,30 +62,51 @@ const baseLogger = winston.createLogger({
 
 // Mapa de métricas únicas
 const metricsMap: Record<string, ReturnType<typeof io.metric>> = {};
+const countersMap: Record<string, ReturnType<typeof io.counter>> = {};
 
 // Adiciona métodos customizados ao logger
 const logger = Object.assign(baseLogger, {
   /**
-   * Envia uma métrica para o PM2+
-   * @param name Nome da métrica
-   * @param value Valor da métrica
+   * Envia uma métrica única (valor direto) para o PM2+, com nome separado por instância
+   * @param name Nome da métrica (sem o nome da instância)
+   * @param value Valor da métrica (string ou número)
    */
   metric(name: string, value: string | number) {
-    if (!metricsMap[name]) {
-      metricsMap[name] = io.metric({ name });
+    const fullName = `${name}_${instanceName}`;
+    if (!metricsMap[fullName]) {
+      metricsMap[fullName] = io.metric({ name: fullName });
     }
-    metricsMap[name].set(value);
+    metricsMap[fullName].set(value);
   },
 
   /**
-   * Envia uma issue para o PM2+
+   * Incrementa um contador PM2+ por nome e instância
+   * @param name Nome do contador
+   * @param increment Valor a ser incrementado (padrão: 1)
+   */
+  counter(name: string, increment = 1) {
+    const fullName = `${name}_${instanceName}`;
+    if (!metricsMap[fullName]) {
+      countersMap[fullName] = io.counter({ name: fullName });
+    }
+    countersMap[fullName].inc(increment);
+  },
+
+  /**
+   * Envia uma issue (erro crítico) para o PM2+
    * @param error Mensagem ou objeto Error
-   * @param context Objeto de contexto (opcional)
+   * @param context Objeto adicional com contexto (opcional)
    */
   issue(error: string | Error, context: Record<string, any> = {}) {
     const err = error instanceof Error ? error : new Error(String(error));
-    io.notifyError(err, { custom: context });
+    io.notifyError(err, {
+      custom: {
+        instance: instanceName,
+        ...context,
+      },
+    });
   },
 });
+
 
 export default logger;

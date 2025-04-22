@@ -4,18 +4,6 @@ Este módulo realiza a comunicação via socket TCP com leitores RFID, valida TA
 
 ---
 
-## 📁 Estrutura do Projeto
-
-```
-/antena-app
-├── logger.ts
-├── main.ts
-├── .env
-├── package.json
-└── logs/
-```
-
----
 
 ## 🔧 Variáveis de Ambiente (`.env`)
 
@@ -33,8 +21,8 @@ ANTENNA2_PORT=4002
 ANTENNA2_DIRECTION=S
 
 # Intervalo e limite de healthcheck
-HEALTHCHECK_INTERVAL=2000
-HEALTHCHECK_COUNT_LIMIT=15
+HEALTHCHECK_INTERVAL=30000  #Tempo em milissegundos
+GATE_TIMEOUT_TO_CLOSE=3000  #Tempo em milissegundos
 ```
 
 ---
@@ -62,25 +50,27 @@ node dist/main.js TAG2
 - Se a resposta for permitida, abre o portão e registra o acesso via `POST /access/register`.
 
 ### Timeout e Healthcheck
-- A cada ciclo de inatividade, envia comando `HEALTHCHECK`.
-- Após 15 ciclos sem resposta, **tenta reconectar**.
+- A cada ciclo de inatividade dado por `HEALTHCHECK_TIMEOUT` milissegundos, envia comando `HEALTHCHECK`.
+- Caso não tenha resposta, **tenta reconectar**.
 - Após 10 tentativas de reconexão, encerra o processo com `process.exit(1)`.
 
+### Abertura e Fechamento do Portão
+- Ao validar uma TAG, envia comando de **abertura** via socket TCP.
+- O portão se mantém aberto por `GATE_TIMEOUT_TO_CLOSE` milissegundos.
+- Ao expirar o tempo, envia automaticamente o comando de **fechamento**.
+- Se o portão já estiver aberto e a mesma TAG for lida, o tempo de fechamento é reiniciado.
 ---
 
 ## 📊 Métricas e Monitoramento (PM2+)
 
 ### Métricas Enviadas
 
-| Nome               | Descrição                            |
-|--------------------|----------------------------------------|
-| `LAST_TAG_READED` | Última TAG válida lida               |
+| Nome              | Descrição                              |
+|-------------------|------------------------------------------|
+| AUTHORIZED        | Contador de TAGs autorizadas            |
+| OPEN_GATE         | Quantidade de aberturas de portão       |
+| CLOSE_GATE        | Quantidade de fechamentos de portão     |
 
-Utiliza:
-
-```ts
-logger.metric("LAST_TAG_READED", tagNumber);
-```
 
 ### Issues Automáticos
 
