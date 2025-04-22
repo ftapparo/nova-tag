@@ -24,10 +24,11 @@ enum GateState {
 dotenv.config();
 
 // Inicialização da antena com base no argumento de execução (TAG1 ou TAG2)
-const selectedAntenna = process.argv[2];
+// const selectedAntenna = process.argv[2];
+const selectedAntenna =  "TAG1";
 
 if (!selectedAntenna || !["TAG1", "TAG2"].includes(selectedAntenna)) {
-  logger.error("Antena não especificada. Use 'TAG1' ou 'TAG2' como argumento.");
+  logger.issue("Antena não especificada. Use 'TAG1' ou 'TAG2' como argumento.");
   process.exit(1);
 }
 
@@ -121,7 +122,7 @@ function connectToAntenna(antenna: AntennaConfig) {
     }
 
     if (healthCheckWaitResponse) {
-      logger.error(`[TIMEOUT] Sem resposta ao HealthCheck. Reiniciando conexão com ${antenna.ip}`);
+      logger.issue(`[TIMEOUT] Sem resposta ao HealthCheck. Reiniciando conexão com ${antenna.ip}`);
       connectionRetry++;
       setImmediate(() => socketInstance.destroy());
       return;
@@ -144,7 +145,7 @@ function connectToAntenna(antenna: AntennaConfig) {
       isReconnecting = true;
 
       if (connectionRetry >= 10) {
-        logger.error("[FATAL] Excedido o número de tentativas de reconexão");
+        logger.issue("[FATAL] Excedido o número de tentativas de reconexão");
         process.exit(1);
       }
 
@@ -158,7 +159,7 @@ function connectToAntenna(antenna: AntennaConfig) {
   // Evento de erro no socket
   client.on("error", (err) => {
     if (!socketInstance.destroyed) {
-      logger.error(`[ERROR] Antena [${antenna.ip}]: ${err.message}`);
+      logger.issue(`[ERROR] Antena [${antenna.ip}]: ${err.message}`);
       socketInstance.destroy();
     }
   });
@@ -168,7 +169,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 function sendCommand(cmd: Buffer, onSuccess?: () => void) {
   socketInstance.write(cmd, (err) => {
     if (err) {
-      logger.error(`[ERROR] Falha ao enviar comando: ${err.message}`);
+      logger.issue(`[ERROR] Falha ao enviar comando: ${err.message}`);
       socketInstance.destroy();
     } else {
       onSuccess?.();
@@ -188,7 +189,7 @@ async function validateTag(tagNumber: string) {
 
     const response = await axios.post("http://localhost:3000/access/verify", validateData);
     if (response.data.status !== "success") {
-      logger.error(`[ERROR] Falha ao consultar TAG ${tagNumber}`);
+      logger.issue(`[ERROR] Falha ao consultar TAG ${tagNumber}`);
       return;
     }
 
@@ -227,14 +228,14 @@ async function validateTag(tagNumber: string) {
 
     const regResponse = await axios.post("http://localhost:3000/access/register", registerData);
     if (regResponse.data.status !== "success") {
-      logger.error(`[ERROR] Falha ao registrar acesso - TAG ${tagNumber}`);
+      logger.issue(`[ERROR] Falha ao registrar acesso - TAG ${tagNumber}`);
     } else {
       const timestamp = new Date().toTimeString().split(" ")[0];
       const sentido = antenna.direction === "S" ? "Saída" : "Entrada";
       logger.info(`[REGISTER] ID:${responseData.IDENT.trim()} ${responseData.MIDIA.trim()}, ${responseData.NOME.trim()}, ${responseData.DESCRICAO.trim()}, ${sentido} (${timestamp})`);
     }
   } catch (error) {
-    logger.error(`[ERROR] Comunicação com API: ${error}`);
+    logger.issue(`[ERROR] Comunicação com API: ${error}`);
   }
 }
 

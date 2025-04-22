@@ -1,7 +1,7 @@
 import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
-import path from "path";
 import dotenv from "dotenv";
+import path from "path";
 import io from "@pm2/io";
 
 dotenv.config();
@@ -26,6 +26,7 @@ winston.addColors({
   debug: "white",
 });
 
+// Formato para console
 const consoleFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   timestampFormat(),
@@ -34,6 +35,7 @@ const consoleFormat = winston.format.combine(
   })
 );
 
+// Formato para arquivos
 const fileFormat = winston.format.combine(
   timestampFormat(),
   winston.format.printf(({ timestamp, level, message }) => {
@@ -41,7 +43,7 @@ const fileFormat = winston.format.combine(
   })
 );
 
-// Logger base
+// Instância base do logger
 const baseLogger = winston.createLogger({
   level: "debug",
   format: winston.format.combine(winston.format.json()),
@@ -58,13 +60,11 @@ const baseLogger = winston.createLogger({
   ],
 });
 
-// Mapa para métricas únicas
+// Mapa de métricas únicas
 const metricsMap: Record<string, ReturnType<typeof io.metric>> = {};
 
-// Criação do logger com funções adicionais
-const proxyLogger = {
-  ...baseLogger,
-
+// Adiciona métodos customizados ao logger
+const logger = Object.assign(baseLogger, {
   /**
    * Envia uma métrica para o PM2+
    * @param name Nome da métrica
@@ -78,22 +78,14 @@ const proxyLogger = {
   },
 
   /**
-   * Envia uma issue (erro crítico) para o PM2+
-   * @param error Mensagem de erro ou Error
-   * @param context Objeto adicional com contexto
+   * Envia uma issue para o PM2+
+   * @param error Mensagem ou objeto Error
+   * @param context Objeto de contexto (opcional)
    */
   issue(error: string | Error, context: Record<string, any> = {}) {
     const err = error instanceof Error ? error : new Error(String(error));
     io.notifyError(err, { custom: context });
   },
+});
 
-  /**
-   * Wrapper para logger.error que também envia issue para o PM2+
-   */
-  error(message: string, ...args: any[]) {
-    baseLogger.error(message, ...args);
-    this.issue(message);
-  },
-};
-
-export default proxyLogger;
+export default logger;
