@@ -2,6 +2,15 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [1.1.1] - 2025-04-24  
+### Corrigido  
+- Corrigido problema em que o comando de filtro (`FILTER_CMD`) não era aplicado corretamente ao conectar a antena.
+- Adicionada uma pausa de 1 segundo após o envio do comando de **fechamento do portão**, garantindo que o comando de filtro seja aceito pela antena.
+
+### Melhorado  
+- Execução sequencial dos comandos de sincronização (fechamento do portão e configuração do filtro), evitando colisões de buffer e falhas na inicialização da antena.
+
+
 ## [1.1.0] - 2025-04-24
 ### Adicionado
 - Comando de filtro por máscara RFID (`FILTER_CMD`) ao iniciar a conexão com a antena, bloqueando leituras de TAGs indesejadas (ex: Sem Parar).

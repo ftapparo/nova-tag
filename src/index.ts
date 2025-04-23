@@ -84,9 +84,12 @@ function connectToAntenna(antenna: AntennaConfig) {
 
     sendCommand(RELAY_CLOSE_CMD, () => {
       logger.debug(`[SYNC] Reset interno realizado e comando de fechamento enviado`);
+    
+      setTimeout(() => {
+        sendCommand(FILTER_CMD);
+      }, 1000);
     });
-
-    sendCommand(FILTER_CMD);
+    
   });
 
   // Evento ao receber dados do socket
