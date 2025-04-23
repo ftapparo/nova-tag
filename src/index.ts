@@ -24,8 +24,8 @@ enum GateState {
 dotenv.config();
 
 // Inicialização da antena com base no argumento de execução (TAG1 ou TAG2)
-// const selectedAntenna = process.argv[2];
-const selectedAntenna = "TAG1";
+const selectedAntenna = process.argv[2];
+//const selectedAntenna = "TAG1";
 
 if (!selectedAntenna || !["TAG1", "TAG2"].includes(selectedAntenna)) {
   logger.issue("Antena não especificada. Use 'TAG1' ou 'TAG2' como argumento.");
@@ -49,14 +49,13 @@ const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 
 // Variáveis de controle do estado da aplicação
 const lastTags = new Set<string>();
-let socketInstance: net.Socket;
-let gateState: GateState = GateState.CLOSED;
 let healthCheckWaitResponse = false;
+let gateState: GateState = GateState.CLOSED;
+let closeGateTimeout: NodeJS.Timeout | null = null;
+let socketInstance: net.Socket;
 let isReconnecting = false;
 let isShuttingDown = false;
-let healthCheckCounter = 0;
 let connectionRetry = 0;
-let closeGateTimeout: NodeJS.Timeout | null = null;
 
 // Função principal que conecta à antena e gerencia eventos de comunicação TCP
 function connectToAntenna(antenna: AntennaConfig) {
@@ -69,9 +68,8 @@ function connectToAntenna(antenna: AntennaConfig) {
     // Reset de variáveis de estado ao conectar
     lastTags.clear();                 //limpa todas as tags lidas
     healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
-    healthCheckCounter = 0;           //contador de healthcheck reiniciado
-    isReconnecting = false;           //indica que não está reconectando
     gateState = GateState.CLOSED;     //estado do portão fechado
+    isReconnecting = false;           //indica que não está reconectando
 
     if (closeGateTimeout) {
       clearTimeout(closeGateTimeout);
@@ -91,41 +89,58 @@ function connectToAntenna(antenna: AntennaConfig) {
 
     const hexData = data.toString("hex");   // Converte os dados recebidos para hexadecimal
     connectionRetry = 0;                    // Reseta o contador de tentativas de conexão
+    healthCheckWaitResponse = false;        // Reseta o estado de espera por resposta do healthcheck
 
     // Resposta de HealthCheck
     if (hexData.startsWith("cf000050")) {
       logger.debug(`[HEALTHCHECK] Conexão estável, aguardando nova leitura`);
-      healthCheckWaitResponse = false;      // Reseta o estado de espera por resposta do healthcheck
       return;
     }
 
     // Resposta de comando de fechamento
-    if (hexData.startsWith("cf000077020001")) {
+    else if (hexData.startsWith("cf000077020001")) {
       logger.debug(`[STATE] Portão fechado`);
+      logger.counter("CLOSE_GATE");   // Incrementa o contador de abertura de portão
       gateState = GateState.CLOSED;
-      if (closeGateTimeout) {
-        clearTimeout(closeGateTimeout);
-        closeGateTimeout = null;
-      }
       return;
     }
 
     // Leitura de TAG detectada
-    if (hexData.startsWith("cf00000112")) {
+    else if (hexData.startsWith("cf00000112")) {
       const tagNumber = "0" + hexData.slice(-13, -4);   // Extrai o número da TAG do dado recebido
       logger.debug(`[READ] TAG ${tagNumber}`);
 
       if (lastTags.has(tagNumber)) {
         logger.info(`[AUTHORIZED] TAG ${tagNumber} autorizada`);
-        openGate(tagNumber);      // Abre o portão se a TAG já foi validada
+        openGate();      // Abre o portão se a TAG já foi validada
+        return;
       } else {
         validateTag(tagNumber);   // Valida a TAG via API externa
+        return;
       }
+    }
+
+    // Mensagem diferete do esperado
+    else {
+      logger.debug(`[UNKNOWN] Mensagem desconhecida: ${hexData}`);
     }
   });
 
   // Evento de inatividade (timeout) no socket
   client.on("timeout", () => {
+
+    if(gateState === GateState.OPEN) {
+      logger.debug(`[TIMEOUT] Portão travado aberto. Reiniciando conexão.`);
+      setImmediate(() => socketInstance.destroy());
+      return;
+    }
+
+    if (healthCheckWaitResponse ) {
+      logger.error(`[TIMEOUT] Antena ${antenna.ip} não respondeu ao HealthCheck. Reiniciando conexão.`);
+      setImmediate(() => socketInstance.destroy());
+      return;
+    }
+
     sendCommand(HEALTHCHECK_CMD, () => {
       healthCheckWaitResponse = true;
       logger.warn(`[TIMEOUT] Inatividade detectada. HealthCheck enviado`);
@@ -142,6 +157,12 @@ function connectToAntenna(antenna: AntennaConfig) {
 
   // Evento de desconexão do socket
   client.on("close", () => {
+
+    if (connectionRetry >= 10) {
+      logger.issue("[ERROR] Excedido o número de tentativas de reconexão");
+      process.exit(1);
+    }
+
     if (!isReconnecting) {
       logger.warn(`[DISCONNECTED] Antena [${antenna.ip}]. Tentando reconectar...`);
       isReconnecting = true;
@@ -151,13 +172,8 @@ function connectToAntenna(antenna: AntennaConfig) {
         closeGateTimeout = null;
       }
 
-      if (connectionRetry >= 10) {
-        logger.issue("[ERROR] Excedido o número de tentativas de reconexão");
-        process.exit(1);
-      }
-      else {
-        setTimeout(() => { connectToAntenna(antenna) }, 5000);
-      }
+      connectionRetry++;
+      setTimeout(() => { connectToAntenna(antenna) }, 3000);
     }
   });
 
@@ -207,14 +223,14 @@ async function validateTag(tagNumber: string) {
     logger.info(`[AUTHORIZED] TAG ${tagNumber} autorizada`);
 
     lastTags.add(tagNumber);
-    logger.counter("AUTHORIZED", 1); // Incrementa o contador de tags autorizadas
+    logger.counter("AUTHORIZED"); // Incrementa o contador de tags autorizadas
 
     if (lastTags.size > 3) {
       const oldest = Array.from(lastTags)[0];
       lastTags.delete(oldest);
     }
 
-    openGate(tagNumber);
+    openGate();
 
     const registerData = {
       dispositivo: antenna.device,
@@ -247,34 +263,33 @@ async function validateTag(tagNumber: string) {
 }
 
 // Comando de abertura do portão, respeitando o estado atual
-function openGate(tagNumber: string) {
+function openGate() {
   if (gateState === GateState.CLOSED) {
     sendCommand(RELAY_OPEN_CMD, () => {
-      gateState = GateState.OPEN;
       logger.debug(`[COMMAND] Abrindo portão`);
-      logger.counter("OPEN_GATE", 1);   // Incrementa o contador de abertura de portão
+      logger.counter("OPEN_GATE");   // Incrementa o contador de abertura de portão
+      gateState = GateState.OPEN;
+      resetCloseTimer();
     });
   } else {
     logger.debug(`[STATE] Portão aberto`);
+    resetCloseTimer();
   }
-
-  resetCloseTimer(tagNumber);
 }
 
 // Reseta o timer de fechamento do portão, se necessário
-function resetCloseTimer(tagNumber: string) {
+function resetCloseTimer() {
   if (gateState === GateState.OPEN) {
 
     if (closeGateTimeout) clearTimeout(closeGateTimeout);
 
     closeGateTimeout = setTimeout(() => {
-      if (gateState === GateState.OPEN) {
+
         sendCommand(RELAY_CLOSE_CMD, () => {
-          gateState = GateState.CLOSED;
-          logger.debug(`[COMMAND] Fechando portão`);
-          logger.counter("CLOSE_GATE", 1);   // Incrementa o contador de abertura de portão
+          gateState = GateState.CLOSING;
+          logger.debug(`[COMMAND] Fechando portão`);          
         });
-      }
+
     }, GATE_TIMEOUT_TO_CLOSE);
   }
 }

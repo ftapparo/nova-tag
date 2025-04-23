@@ -2,6 +2,11 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [1.0.6] - 2025-04-23
+### Corrigido
+- Corrigido erro de ordem na execução do temporizador de fechamento do portão (`resetCloseTimer`), que era disparado antes da atualização do estado `gateState` para `OPEN`.
+- A função `resetCloseTimer` foi movida para dentro do callback de `sendCommand(RELAY_OPEN_CMD)` garantindo consistência entre o estado do portão e o acionamento do temporizador.
+
 ## [1.0.5] - 2025-04-23
 ### Adicionado
 - Implementado temporizador global para fechamento automático do portão (`GATE_TIMEOUT_TO_CLOSE`).

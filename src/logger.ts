@@ -84,12 +84,12 @@ const logger = Object.assign(baseLogger, {
    * @param name Nome do contador
    * @param increment Valor a ser incrementado (padrão: 1)
    */
-  counter(name: string, increment = 1) {
+  counter(name: string) {
     const fullName = `${name}_${instanceName}`;
-    if (!metricsMap[fullName]) {
+    if (!countersMap[fullName]) {
       countersMap[fullName] = io.counter({ name: fullName });
     }
-    countersMap[fullName].inc(increment);
+    countersMap[fullName].inc();
   },
 
   /**
