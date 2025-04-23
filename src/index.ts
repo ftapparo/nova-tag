@@ -46,6 +46,8 @@ const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
+const FILTER_CMD = Buffer.from("CFFF00731601000000000001050208880000000000000000000001E6B1", "hex");
+
 
 // Variáveis de controle do estado da aplicação
 const lastTags = new Set<string>();
@@ -80,8 +82,11 @@ function connectToAntenna(antenna: AntennaConfig) {
     logger.info(`[CONNECTED] Antena RFID [IP: ${antenna.ip}]`);
     logger.debug(`[HEALTHCHECK] Timeout de conexão ${HEALTHCHECK_TIMEOUT}ms`);
 
-    sendCommand(RELAY_CLOSE_CMD);
-    logger.debug(`[SYNC] Reset interno realizado e comando de fechamento enviado`);
+    sendCommand(RELAY_CLOSE_CMD, () => {
+      logger.debug(`[SYNC] Reset interno realizado e comando de fechamento enviado`);
+    });
+
+    sendCommand(FILTER_CMD);
   });
 
   // Evento ao receber dados do socket
@@ -98,10 +103,28 @@ function connectToAntenna(antenna: AntennaConfig) {
     }
 
     // Resposta de comando de fechamento
+    else if (hexData.startsWith("cf000073")) {
+      if (hexData.startsWith("cf000073020001")) {
+        logger.debug("[MASK] Filtro por máscara configurado com sucesso");
+      }
+      else {
+        logger.error("[ERROR] Falha ao configurar filtro por máscara");
+        setImmediate(() => socketInstance.destroy());
+      }
+      return;
+    }
+
+    // Resposta de comando de fechamento
     else if (hexData.startsWith("cf000077020001")) {
       logger.debug(`[STATE] Portão fechado`);
       logger.counter("CLOSE_GATE");   // Incrementa o contador de abertura de portão
       gateState = GateState.CLOSED;
+      return;
+    }
+
+    // Resposta de comando de abertura
+    else if (hexData.startsWith("cf00007703")) {
+      logger.debug(`[STATE] Portão aberto`);
       return;
     }
 

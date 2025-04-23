@@ -2,6 +2,24 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [1.1.0] - 2025-04-24
+### Adicionado
+- Comando de filtro por máscara RFID (`FILTER_CMD`) ao iniciar a conexão com a antena, bloqueando leituras de TAGs indesejadas (ex: Sem Parar).
+- Verificação da resposta da antena ao comando de filtro (`0x73`) com confirmação de sucesso ou erro.
+- Validação da resposta da máscara via prefixo `cf000073020001`.
+- Destruição imediata do socket e reconexão forçada em caso de falha ao aplicar a máscara.
+
+### Corrigido
+- `resetCloseTimer()` agora é chamado **somente após confirmação da abertura do portão**, garantindo que o estado já esteja `OPEN` antes do temporizador iniciar.
+- Correção da ordem de envio dos comandos na conexão: agora o comando de sincronização (`RELAY_CLOSE_CMD`) é seguido corretamente pelo comando de máscara (`FILTER_CMD`).
+
+### Melhorado
+- Logs mais claros para depuração, incluindo:
+  - Logs específicos para resposta de máscara aplicada.
+  - Logs de erro em casos de falha na aplicação da máscara.
+  - Identificação de mensagens desconhecidas com conteúdo em hexadecimal.
+- Isolamento completo do controle de fluxo por máscara e maior confiabilidade ao conectar/reconectar.
+
 ## [1.0.6] - 2025-04-23
 ### Corrigido
 - Corrigido erro de ordem na execução do temporizador de fechamento do portão (`resetCloseTimer`), que era disparado antes da atualização do estado `gateState` para `OPEN`.
