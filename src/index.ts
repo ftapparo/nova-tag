@@ -46,8 +46,7 @@ const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
-const FILTER_CMD = Buffer.from("CFFF00731601000000000001050208880000000000000000000001E6B1", "hex");
-
+const FILTER_CMD = Buffer.from(String(process.env.FILTER_DATA) || "", "hex");
 
 // Variáveis de controle do estado da aplicação
 const lastTags = new Set<string>();
@@ -86,6 +85,7 @@ function connectToAntenna(antenna: AntennaConfig) {
       logger.debug(`[SYNC] Reset interno realizado e comando de fechamento enviado`);
     
       setTimeout(() => {
+        logger.debug(`[MASK] Configurando filtro  - ${FILTER_CMD.toString('hex').toUpperCase()}`);
         sendCommand(FILTER_CMD);
       }, 1000);
     });
@@ -99,6 +99,8 @@ function connectToAntenna(antenna: AntennaConfig) {
     connectionRetry = 0;                    // Reseta o contador de tentativas de conexão
     healthCheckWaitResponse = false;        // Reseta o estado de espera por resposta do healthcheck
 
+    //logger.debug(`Mensagem: ${hexData}`);
+
     // Resposta de HealthCheck
     if (hexData.startsWith("cf000050")) {
       logger.debug(`[HEALTHCHECK] Conexão estável, aguardando nova leitura`);
@@ -109,6 +111,7 @@ function connectToAntenna(antenna: AntennaConfig) {
     else if (hexData.startsWith("cf000073")) {
       if (hexData.startsWith("cf000073020001")) {
         logger.debug("[MASK] Filtro por máscara configurado com sucesso");
+
       }
       else {
         logger.error("[ERROR] Falha ao configurar filtro por máscara");
@@ -135,6 +138,8 @@ function connectToAntenna(antenna: AntennaConfig) {
     else if (hexData.startsWith("cf00000112")) {
       const tagNumber = "0" + hexData.slice(-13, -4);   // Extrai o número da TAG do dado recebido
       logger.debug(`[READ] TAG ${tagNumber}`);
+      
+      //logger.debug(`[READ]  ${hexData}`);
 
       if (lastTags.has(tagNumber)) {
         logger.info(`[AUTHORIZED] TAG ${tagNumber} autorizada`);
@@ -148,7 +153,7 @@ function connectToAntenna(antenna: AntennaConfig) {
 
     // Mensagem diferete do esperado
     else {
-      logger.debug(`[UNKNOWN] Mensagem desconhecida: ${hexData}`);
+      //logger.debug(`[UNKNOWN] Mensagem desconhecida: ${hexData}`);
     }
   });
 
