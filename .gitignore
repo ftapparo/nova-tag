@@ -9,3 +9,6 @@ package-lock.json
 
 # Env files
 .env
+
+# Backup files
+bkp/

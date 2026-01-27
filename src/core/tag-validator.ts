@@ -1,9 +1,3 @@
-/**
- * @file tag-validator.ts
- * @description Validação de TAG RFID, cache local, integração com API externa e registro de acesso.
- * @date 28/09/2025
- */
-
 import logger from '../utils/logger';
 
 /**

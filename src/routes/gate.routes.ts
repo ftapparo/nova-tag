@@ -1,9 +1,3 @@
-/**
- * @file gate.routes.ts
- * @description Define as rotas relacionadas ao controle de portão da aplicação.
- * @date 2025-09-28
- */
-
 import express from 'express';
 import { getGateState, openGate, closeGate, restartAntennaConnection } from '../controllers/gate.controller';
 import { AntennaManager } from '../core/antenna-manager';
@@ -25,6 +19,9 @@ export default (antennaInstance: AntennaManager) => {
 
     // Rota para abrir o portão
     router.post('/gate/open', gateControl.openGate);
+
+    // Rota para abrir o portão com tempo para fechamento automático
+    router.post('/gate/open/:autoCloseTime', gateControl.openGate);
 
     // Rota para fechar o portão
     router.post('/gate/close', gateControl.closeGate);

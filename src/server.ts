@@ -1,9 +1,3 @@
-/**
- * @file server.ts
- * @description Ponto de entrada principal da aplicação. Inicializa o serviço web (Express) e as conexões de socket com as antenas RFID (TAG1 e TAG2).
- * @date 28/09/2025
- */
-
 import dotenv from 'dotenv';
 import { StartWebServer } from './api/web-server.api';
 import { AntennaManager, AntennaConfig } from './core/antenna-manager';

@@ -1,10 +1,3 @@
-// Importações de módulos essenciais
-/**
- * @file antenna-manager.ts
- * @description Gerencia conexão, eventos e integração entre antena RFID, controle de portão e validação de TAGs.
- * @date 28/09/2025
- */
-
 import net from 'net';
 import dotenv from 'dotenv';
 import logger from '../utils/logger';
@@ -272,9 +265,9 @@ export class AntennaManager {
         return 'unknown';
     }
   }
-  public openGate(): boolean {
+  public openGate(autoCloseTime?: number): boolean {
     if (gateController) {
-      gateController.openGate();
+      gateController.openGate(autoCloseTime);
       return true;
     }
     return false;

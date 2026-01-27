@@ -1,15 +1,3 @@
-/**
- * @file swagger.ts
- * @description Configuração do Swagger/OpenAPI para documentação automática da API.
- *
- * Este arquivo define o objeto swaggerSpec, que é utilizado para gerar a documentação interativa
- * da API (Swagger UI) e o arquivo OpenAPI JSON. Inclui informações como tags, descrição, servidores e paths das rotas/controllers.
- *
- * - Usa swagger-autogen para gerar o spec a partir de comentários JSDoc nas rotas/controllers.
- * - O fileExtension é ajustado conforme o ambiente para suportar .ts em desenvolvimento e .js em produção.
- * - As rotas e controllers devem conter comentários JSDoc compatíveis com Swagger para aparecerem na documentação.
- */
-
 import dotenv from 'dotenv';
 dotenv.config();
 

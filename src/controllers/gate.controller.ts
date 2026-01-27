@@ -1,9 +1,3 @@
-/**
- * @file gate.controller.ts
- * @description Endpoint de controle de portão da aplicação.
- * @date 2025-09-28
- */
-
 import { Request, Response } from 'express';
 import { AntennaManager } from '../core/antenna-manager';
 
@@ -42,7 +36,9 @@ export const openGate = async (req: Request, res: Response, antennaInstance: Ant
             return;
         }
 
-        const result = await antennaInstance.openGate();
+        const autoCloseTime = req.params.autoCloseTime ? parseInt(req.params.autoCloseTime, 10) : undefined;
+
+        const result = await antennaInstance.openGate(autoCloseTime);
 
         if (result === true) {
             // #swagger.responses[200] = { description: 'Comando de abertura enviado com sucesso.' }

@@ -1,9 +1,3 @@
-/**
- * @file gate-controller.ts
- * @description Controlador de portão: gerencia comandos de abertura/fechamento, estado, timers e integração com socket TCP para antenas RFID.
- * @date 28/09/2025
- */
-
 import net from 'net';
 import logger from '../utils/logger';
 
@@ -64,7 +58,7 @@ export class GateController {
      * Envia comando para abrir o portão, inicia timer de fechamento automático e atualiza estado
      * @returns Promise<boolean> true se comando enviado com sucesso
      */
-    async openGate(): Promise<boolean> {
+    async openGate(autoCloseTime?: number): Promise<boolean> {
         if (this.state !== GateState.CLOSED) {
             logger.warn('[GateController] Tentativa de abrir portão já em estado', { state: this.state, antennaId: this.antennaId });
             return false;
@@ -80,7 +74,7 @@ export class GateController {
             this.openTimer = setTimeout(() => {
                 // Comentário: fechamento automático após tempo configurado
                 this.closeGate();
-            }, this.openDurationMs);
+            }, autoCloseTime ?? this.openDurationMs);
 
             this.state = GateState.OPEN;
             return true;

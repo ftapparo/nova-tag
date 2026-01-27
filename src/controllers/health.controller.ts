@@ -1,9 +1,3 @@
-/**
- * @file health.controller.ts
- * @description Endpoint de health check da aplicação — verifica dependências essenciais (BD, Redis, filas) e retorna status operacional.
- * @date 2025-09-22
- */
-
 import { Request, Response } from 'express';
 
 /**
