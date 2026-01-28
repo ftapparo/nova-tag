@@ -36,7 +36,9 @@ export const openGate = async (req: Request, res: Response, antennaInstance: Ant
             return;
         }
 
-        const autoCloseTime = req.params.autoCloseTime ? parseInt(req.params.autoCloseTime, 10) : undefined;
+        const autoCloseTime = req.params.autoCloseTime
+            ? parseInt(Array.isArray(req.params.autoCloseTime) ? req.params.autoCloseTime[0] : req.params.autoCloseTime, 10)
+            : undefined;
 
         const result = await antennaInstance.openGate(autoCloseTime);
 
