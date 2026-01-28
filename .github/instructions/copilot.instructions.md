@@ -21,14 +21,6 @@ applyTo: '**'
 
 ## Comentários
 
-- Cabeçalhos de seção em arquivos:
-  ```ts
-    /**
-    * @file Nome do arquivo
-    * @description Descrição completa do arquivo e seu propósito
-    * @date Data de criação
-    */
-  ```
 - Comentários de documentação em formato JSDoc acima de funções, métodos e controllers:
   ```ts
   /**

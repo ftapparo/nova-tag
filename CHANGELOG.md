@@ -2,6 +2,32 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [2.0.0] - 2026-01-27
+### Adicionado
+- Reestruturação completa da arquitetura do projeto com separação em camadas (controllers, core, routes, utils).
+- API Web Server com Express para gerenciamento remoto do sistema.
+- Documentação automática com Swagger em `/swagger`.
+- Endpoint `/health` para monitoramento do status do sistema e antena.
+- Endpoints REST para controle do portão: `/api/gate/open` e `/api/gate/close`.
+- Classe `AntennaManager` centralizada para gerenciamento da conexão e comunicação com a antena.
+- Classe `GateController` para lógica de controle do portão e temporizadores.
+- Classe `TagValidator` para validação de TAGs com integração à API externa.
+- Sistema de rotas modular com Express Router.
+- Suporte a Docker com Dockerfile otimizado e múltiplos ambientes (.env).
+
+### Melhorado
+- Separação clara de responsabilidades entre camadas (API, Controllers, Core, Routes).
+- Organização do código em módulos reutilizáveis e testáveis.
+- Logger padronizado com suporte a contexto e tipos (`info`, `error`, `debug`).
+- Tratamento de erros centralizado e respostas HTTP padronizadas.
+- Configuração de ambiente mais robusta com validação de variáveis obrigatórias.
+- Documentação do código com JSDoc e comentários de contexto.
+
+### Alterado
+- Migração de aplicação monolítica para arquitetura modular em camadas.
+- Controle de portão agora pode ser acionado via API REST além da leitura RFID.
+- Logger migrado para módulo utilitário com contexto personalizado.
+
 ## [1.1.1] - 2025-04-24  
 ### Corrigido  
 - Corrigido problema em que o comando de filtro (`FILTER_CMD`) não era aplicado corretamente ao conectar a antena.

@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  nova-tag:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: nova-tag:latest
+    container_name: nova-tag
+    restart: unless-stopped
+    ports:
+      - "4009:4009"  # Porta do webserver TAG1
+      - "4010:4010"  # Porta do webserver TAG2
+    environment:
+      - NODE_ENV=production
+      # Adicione aqui as variáveis de ambiente necessárias
+      # - API_KEY=${API_KEY}
+      # - DATABASE_URL=${DATABASE_URL}
+    volumes:
+      # Mapeia logs para pasta compartilhada do Windows montada no Ubuntu
+      - /mnt/windows/nova-tag/logs:/app/logs
+      # Se houver arquivos .env, descomente a linha abaixo
+      # - .env:/app/.env:ro
+    networks:
+      - nova-tag-network
+    healthcheck:
+      test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4009/health && wget --quiet --tries=1 --spider http://localhost:4010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  nova-tag-network:
+    driver: bridge

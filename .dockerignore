@@ -1,0 +1,10 @@
+# Adicione este arquivo ao .gitignore se necessário
+
+# Logs do PM2
+logs/
+*.log
+
+# Arquivos de ambiente
+.env
+.env.*
+!.env.example
