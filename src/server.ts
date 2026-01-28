@@ -1,75 +1,70 @@
-import express, { Request, Response } from 'express';
+import dotenv from 'dotenv';
+import { StartWebServer } from './api/web-server.api';
+import { AntennaManager, AntennaConfig } from './core/antenna-manager';
+
+// Carrega variáveis de ambiente do arquivo .env
+dotenv.config();
 
 /**
- * Determina qual instância inicializar baseado no argumento passado
+ * Inicializa o serviço web (Express) e as conexões de socket com as antenas RFID (TAG1 e TAG2).
+ * Cada instância de AntennaManager gerencia uma antena específica.
  */
-function startServer(): void {
-    const app = express();
+async function StartService(): Promise<void> {
 
-    let port: number;
-    let tagName: string;
+    let antenna: AntennaConfig;
 
-    // Identifica qual instância deve subir
     if (process.argv.includes('TAG1')) {
-        port = 4009;
-        tagName = 'TAG1';
-    } else if (process.argv.includes('TAG2')) {
-        port = 4010;
-        tagName = 'TAG2';
-    } else {
+        antenna = {
+            id: 1,
+            name: 'TAG1',
+            device: 9,
+            ip: '192.168.0.236',
+            port: 2022,
+            direction: 'E',
+            webserver: true,
+            webserverPort: 4009,
+        };
+    }
+    else if (process.argv.includes('TAG2')) {
+        antenna = {
+            id: 2,
+            name: 'TAG2',
+            device: 10,
+            ip: '192.168.0.237',
+            port: 2023,
+            direction: 'S',
+            webserver: true,
+            webserverPort: 4010,
+        };
+    }
+    else {
         console.error('[Server] Nenhum argumento de antena fornecido. Use "TAG1" ou "TAG2".');
         process.exit(1);
     }
 
-    // Middleware para parse de JSON
-    app.use(express.json());
+    try {
+        const instanceAntenna = new AntennaManager(antenna);
+        instanceAntenna.connectToAntenna();
+        console.log(`[Server] Antena ${antenna.id} inicializada.`);
 
-    /**
-     * Rota de health check para monitoramento do container
-     * @route GET /health
-     */
-    app.get('/health', (req: Request, res: Response) => {
-        res.status(200).json({
-            status: 'OK',
-            tag: tagName,
-            port: port,
-            timestamp: new Date().toISOString(),
-            uptime: process.uptime(),
-            pid: process.pid,
+        // Inicializa o serviço web
+        await StartWebServer(instanceAntenna);
+        console.log('[Server] Serviço web inicializado.');
+
+        // Finaliza a aplicação com limpeza adequada do socket
+        process.on("SIGINT", () => {
+            if (instanceAntenna) {
+                instanceAntenna.shutdown();
+            }
         });
-    });
 
-    /**
-     * Rota raiz
-     * @route GET /
-     */
-    app.get('/', (req: Request, res: Response) => {
-        res.status(200).json({
-            message: `Nova Tag - ${tagName}`,
-            version: '1.1.1',
-            port: port,
-        });
-    });
-
-    // Inicia o servidor
-    app.listen(port, () => {
-        console.log(`[Server] ${tagName} rodando na porta ${port}`);
-        console.log(`[Server] Health check disponível em: http://localhost:${port}/health`);
-        console.log(`[Server] PID: ${process.pid}`);
-    });
-
-    // Graceful shutdown
-    process.on('SIGINT', () => {
-        console.log(`\n[Server] ${tagName} finalizando...`);
-        process.exit(0);
-    });
-
-    process.on('SIGTERM', () => {
-        console.log(`\n[Server] ${tagName} finalizando...`);
-        process.exit(0);
-    });
+    } catch (err) {
+        // eslint-disable-next-line no-console
+        console.error(`[Server] Erro ao inicializar a antena ${antenna.id}:`, err);
+        process.exit(1);
+    }
 }
 
-// Inicia o servidor
-startServer();
+// Inicia o serviço
+StartService();
 
