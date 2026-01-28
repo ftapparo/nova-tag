@@ -7,8 +7,8 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Instala dependências
-RUN npm ci --only=production && \
+# Instala TODAS as dependências (incluindo devDependencies para o build)
+RUN npm ci && \
     npm cache clean --force
 
 # Copia código fonte
@@ -25,10 +25,15 @@ RUN npm install -g pm2
 
 WORKDIR /app
 
-# Copia dependências e build da stage anterior
-COPY --from=builder /app/node_modules ./node_modules
+# Copia apenas package.json para instalar dependências de produção
+COPY package*.json ./
+
+# Instala apenas dependências de produção
+RUN npm ci --only=production && \
+    npm cache clean --force
+
+# Copia build da stage anterior
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/package*.json ./
 
 # Copia arquivo de configuração do PM2
 COPY ecosystem.config.js ./
