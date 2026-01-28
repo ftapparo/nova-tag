@@ -8,7 +8,7 @@ COPY package*.json ./
 COPY tsconfig.json ./
 
 # Instala TODAS as dependências (incluindo devDependencies para o build)
-RUN npm ci && \
+RUN npm install && \
     npm cache clean --force
 
 # Copia código fonte
@@ -29,7 +29,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Instala apenas dependências de produção
-RUN npm ci --only=production && \
+RUN npm install --only=production && \
     npm cache clean --force
 
 # Copia build da stage anterior
