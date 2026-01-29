@@ -3,7 +3,6 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nova-tag:latest
     container_name: nova-tag
     restart: unless-stopped
     ports:
