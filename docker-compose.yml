@@ -10,6 +10,7 @@ services:
       - "4010:4010"  # Porta do webserver TAG2
     environment:
       - NODE_ENV=production
+      - API_BASE_URL=http://192.168.0.250:3000
       - HEALTHCHECK_TIMEOUT=30000
       - GATE_TIMEOUT_TO_CLOSE=3000
       - ATTEMPT_RECONNECT=3
