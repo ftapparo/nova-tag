@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: nova-tag:latest
+    # image: nova-tag:latest  # Comentado para evitar tentativa de pull do registry
     container_name: nova-tag
     restart: unless-stopped
     ports:
