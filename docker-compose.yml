@@ -10,9 +10,10 @@ services:
       - "4010:4010"  # Porta do webserver TAG2
     environment:
       - NODE_ENV=production
-      # Adicione aqui as variáveis de ambiente necessárias
-      # - API_KEY=${API_KEY}
-      # - DATABASE_URL=${DATABASE_URL}
+      - HEALTHCHECK_TIMEOUT=30000
+      - GATE_TIMEOUT_TO_CLOSE=3000
+      - ATTEMPT_RECONNECT=3
+      - FILTER_DATA=cfff0076290100ffffffff01080105000000000000000000000000000000000000000000000000000000000000008ec3
     volumes:
       # Mapeia logs para pasta compartilhada do Windows montada no Ubuntu
       - /mnt/windows/nova-tag/logs:/app/logs
