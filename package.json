@@ -15,7 +15,6 @@
   "type": "commonjs",
   "main": "server.js",
   "scripts": {
-    "swagger": "tsx src/swagger.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "ts-node-dev --respawn src/server.ts"
@@ -31,7 +30,6 @@
     "express": "^5.1.0",
     "net": "^1.0.2",
     "node-firebird": "^1.1.9",
-    "swagger-autogen": "^2.23.7",
     "swagger-ui-express": "^5.0.1",
     "typescript": "^5.8.2",
     "winston": "^3.17.0",
@@ -45,6 +43,7 @@
     "@typescript-eslint/eslint-plugin": "^8.14.0",
     "@typescript-eslint/parser": "^8.14.0",
     "eslint": "^9.15.0",
+    "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "typescript": "^5.6.3"
   }

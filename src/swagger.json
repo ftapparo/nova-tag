@@ -1,0 +1,285 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "API Controle do Portão - Condomínio Nova Residence",
+    "description": "API para controle de portão automatizado com leitura RFID das antenas TAG1 e TAG2",
+    "version": "1.1.1"
+  },
+  "servers": [
+    {
+      "url": "http://localhost:4009",
+      "description": "TAG1 - Desenvolvimento local"
+    },
+    {
+      "url": "http://localhost:4010",
+      "description": "TAG2 - Desenvolvimento local"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Healthcheck",
+      "description": "Verificações de status da aplicação"
+    },
+    {
+      "name": "Gate",
+      "description": "Funcionalidades para controle de portão: abertura, fechamento e status"
+    }
+  ],
+  "paths": {
+    "/health": {
+      "get": {
+        "tags": [
+          "Healthcheck"
+        ],
+        "summary": "Verifica o status da API",
+        "description": "Endpoint para verificar o status da API e suas dependências",
+        "responses": {
+          "200": {
+            "description": "API funcionando corretamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "OK"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/healthcheck": {
+      "get": {
+        "tags": [
+          "Healthcheck"
+        ],
+        "summary": "Verifica o status da API",
+        "description": "Endpoint alternativo para verificar o status da API",
+        "responses": {
+          "200": {
+            "description": "API funcionando corretamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "OK"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate/state": {
+      "get": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Obtém o estado atual do portão",
+        "description": "Retorna o estado atual do portão (OPEN, CLOSED, UNKNOWN)",
+        "responses": {
+          "200": {
+            "description": "Estado atual do portão",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "state": {
+                      "type": "string",
+                      "enum": [
+                        "OPEN",
+                        "CLOSED",
+                        "UNKNOWN"
+                      ],
+                      "example": "CLOSED"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate/open": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Abre o portão",
+        "description": "Envia comando para abrir o portão sem tempo de fechamento automático",
+        "responses": {
+          "200": {
+            "description": "Comando de abertura enviado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Comando de abertura enviado com sucesso."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha ao enviar comando",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Falha ao enviar comando para abrir o portão."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate/open/{autoCloseTime}": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Abre o portão com fechamento automático",
+        "description": "Envia comando para abrir o portão com tempo definido em segundos para fechamento automático",
+        "parameters": [
+          {
+            "name": "autoCloseTime",
+            "in": "path",
+            "required": true,
+            "description": "Tempo em segundos para fechamento automático do portão",
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "example": 10
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Comando de abertura enviado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Comando de abertura enviado com sucesso."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha ao enviar comando",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Falha ao enviar comando para abrir o portão."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate/close": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Fecha o portão",
+        "description": "Envia comando para fechar o portão imediatamente",
+        "responses": {
+          "200": {
+            "description": "Comando de fechamento enviado com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Comando de fechamento enviado com sucesso."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha ao enviar comando",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Falha ao enviar comando para fechar o portão."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/gate/restart": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Reinicia a conexão com a antena",
+        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas",
+        "responses": {
+          "200": {
+            "description": "Conexão reiniciada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Conexão com a antena reiniciada com sucesso."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

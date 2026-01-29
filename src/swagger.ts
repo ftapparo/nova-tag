@@ -5,9 +5,9 @@ import swaggerAutogen from 'swagger-autogen';
 
 /**
  * Define a extensão dos arquivos a serem lidos pelo swagger-autogen.
- * Usa .ts em desenvolvimento e .js em produção.
+ * Sempre usa .ts em desenvolvimento.
  */
-const fileExtension = process.env.NODE_ENV === 'development' ? 'ts' : 'js';
+const fileExtension = 'ts';
 
 /**
  * Define a porta do servidor, padrão 3000 se não especificada na variável de ambiente.
@@ -54,14 +54,10 @@ const doc = {
 
 let endpointsFiles = [];
 
-endpointsFiles.push(`./src/routes/health.routes.${fileExtension}`, `./src/controllers/health.controller.${fileExtension}`);
-endpointsFiles.push(`./src/routes/gate.routes.${fileExtension}`, `./src/controllers/gate.controller.${fileExtension}`);
+endpointsFiles.push(`./src/routes/health.routes.${fileExtension}`);
+endpointsFiles.push(`./src/routes/gate.routes.${fileExtension}`);
 
-let swaggerFile = `../src/swagger.json`;
-
-if (process.env.NODE_ENV !== 'development') {
-  swaggerFile = `../dist/swagger.json`;
-}
+let swaggerFile = `./src/swagger.json`;
 
 /**
  * Gera a documentação Swagger/OpenAPI automaticamente com base nos arquivos especificados.
