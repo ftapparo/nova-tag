@@ -16,8 +16,8 @@ services:
     volumes:
       # Mapeia logs para pasta compartilhada do Windows montada no Ubuntu
       - /mnt/windows/nova-tag/logs:/app/logs
-      # Se houver arquivos .env, descomente a linha abaixo
-      # - .env:/app/.env:ro
+      # Mapeia arquivo .env para o container
+      - ./.env:/app/.env:ro
     networks:
       - nova-tag-network
     healthcheck:

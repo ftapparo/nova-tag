@@ -31,7 +31,7 @@ const consoleFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   timestampFormat(),
   winston.format.printf(({ timestamp, level, message }) => {
-    return `${timestamp} ${level}: ${message}`;
+    return `[${instanceName}] ${timestamp} ${level}: ${message}`;
   })
 );
 
@@ -39,7 +39,7 @@ const consoleFormat = winston.format.combine(
 const fileFormat = winston.format.combine(
   timestampFormat(),
   winston.format.printf(({ timestamp, level, message }) => {
-    return `${timestamp} ${level}: ${message}`;
+    return `[${instanceName}] ${timestamp} ${level}: ${message}`;
   })
 );
 
