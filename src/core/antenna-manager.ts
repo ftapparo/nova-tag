@@ -4,7 +4,9 @@ import logger from '../utils/logger';
 import { GateController } from './gate-controller';
 import { TagValidator, AccessVerifyData } from './tag-validator';
 
-// Tipagem da configuração da antena
+/**
+ * Configuração de conexão e operação da antena RFID.
+ */
 export interface AntennaConfig {
   id: number;
   name: string;
@@ -16,7 +18,9 @@ export interface AntennaConfig {
   webserverPort: number;
 }
 
-// Enum para representar os estados possíveis do portão
+/**
+ * Estados possíveis do portão.
+ */
 enum GateState {
   CLOSED,
   OPENING,
@@ -51,7 +55,13 @@ let gateController: GateController;
 let tagValidator: TagValidator;
 
 /**
- * Classe responsável por gerenciar a antena RFID
+ * Indica se o último healthcheck da antena ainda aguarda resposta.
+ * @returns `true` quando há healthcheck pendente.
+ */
+export const isHealthcheckAwaitingResponse = (): boolean => healthCheckWaitResponse;
+
+/**
+ * Gerencia a conexão TCP com a antena RFID e a lógica de operação do portão.
  */
 export class AntennaManager {
 
@@ -59,17 +69,10 @@ export class AntennaManager {
   public antenna: AntennaConfig;
   public antennaSocket: net.Socket;
   private recentAuthorizedTags: Map<string, AccessVerifyData | undefined> = new Map();
-  private processingTags: Set<string> = new Set();
-  private lastActivityAt: number | null = null;
-  private unhealthySince: number | null = null;
-  private lastRestartAt: number | null = null;
-  private startedAt: number = Date.now();
-  private hasEverConnected = false;
-  private lastConnectedAt: number | null = null;
 
   /**
-   * Inicia a conexão com a antena RFID e gerencia eventos de comunicação TCP
-   * @param antenna Configuração da antena a ser gerenciada
+   * Cria uma instância do gerenciador de antena.
+   * @param antenna Configuração da antena a ser gerenciada.
    */
   constructor(antenna: AntennaConfig) {
     this.antenna = antenna;
@@ -77,8 +80,8 @@ export class AntennaManager {
   }
 
   /**
-   * Conecta à antena RFID e gerencia eventos de comunicação TCP
-   * @param antenna Configuração da antena a ser conectada
+   * Conecta à antena RFID e registra eventos de comunicação TCP.
+   * @returns void.
    */
   public connectToAntenna() {
     const client = new net.Socket();
@@ -96,12 +99,6 @@ export class AntennaManager {
 
     // Evento da conexão do socket
     client.connect(this.antenna.port, this.antenna.ip, () => {
-
-      const now = Date.now();
-      this.lastActivityAt = now;
-      this.unhealthySince = null;
-      this.hasEverConnected = true;
-      this.lastConnectedAt = now;
 
       // Reset de variáveis de estado ao conectar
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
@@ -132,8 +129,6 @@ export class AntennaManager {
 
     // Evento ao receber dados do socket
     client.on("data", async (data) => {
-
-      this.lastActivityAt = Date.now();
 
       const hexData = data.toString("hex");   // Converte os dados recebidos para hexadecimal
       connectionRetry = 0;                    // Reseta o contador de tentativas de conexão
@@ -214,9 +209,6 @@ export class AntennaManager {
         setTimeout(() => {
           if (healthCheckWaitResponse) {
             logger.issue(`[ERROR] A dispositivo excedeu o tempo de resposta`);
-            if (!this.unhealthySince) {
-              this.unhealthySince = Date.now();
-            }
             setImmediate(() => this.antennaSocket.destroy());
           }
         }, 3000);
@@ -225,10 +217,6 @@ export class AntennaManager {
 
     // Evento de desconexão do socket
     client.on("close", () => {
-
-      if (!this.unhealthySince) {
-        this.unhealthySince = Date.now();
-      }
 
       if (connectionRetry > ATTEMPT_RECONNECT) {
         logger.issue("[ERROR] Excedido o número de tentativas de reconexão");
@@ -254,16 +242,14 @@ export class AntennaManager {
     client.on("error", (err) => {
       if (!this.antennaSocket.destroyed) {
         logger.issue(`[ERROR] Antena [${this.antenna.ip}]: ${err.message}`);
-        if (!this.unhealthySince) {
-          this.unhealthySince = Date.now();
-        }
         this.antennaSocket.destroy();
       }
     });
   }
 
   /**
-   * Função para encerrar a aplicação com limpeza adequada do socket
+   * Encerra a aplicação com limpeza adequada do socket.
+   * @returns void.
    */
   public shutdown() {
     if (!isShuttingDown) {
@@ -280,6 +266,10 @@ export class AntennaManager {
     }
   }
 
+  /**
+   * Obtém o estado atual do portão.
+   * @returns Estado atual do portão.
+   */
   public get getGateState(): string {
     switch (gateState) {
       case GateState.CLOSED:
@@ -294,6 +284,13 @@ export class AntennaManager {
         return 'unknown';
     }
   }
+
+  /**
+   * Abre o portão, opcionalmente com fechamento automático.
+   * @param autoCloseTime Tempo em segundos para fechamento automático.
+   * @param options Opções adicionais de abertura.
+   * @returns `true` quando o comando foi enviado com sucesso.
+   */
   public async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean }): Promise<boolean> {
     if (!gateController) {
       return false;
@@ -307,6 +304,10 @@ export class AntennaManager {
     }
   }
 
+  /**
+   * Fecha o portão imediatamente.
+   * @returns `true` quando o comando foi enviado com sucesso.
+   */
   public async closeGate(): Promise<boolean> {
     if (!gateController) {
       return false;
@@ -321,164 +322,51 @@ export class AntennaManager {
   }
 
   /**
-   * Reinicia a conexão TCP com a antena RFID.
-   * Força o encerramento do socket atual e tenta reconectar.
-   * @returns Retorna true se o fluxo de reinício foi disparado
-   */
-  public async restartConnection(): Promise<boolean> {
-    try {
-      this.lastRestartAt = Date.now();
-      if (this.antennaSocket && !this.antennaSocket.destroyed) {
-        logger.warn(`[RESTART] Reiniciando conexão da antena [${this.antenna.ip}]`);
-        this.antennaSocket.destroy();
-      } else {
-        logger.warn(`[RESTART] Socket já estava encerrado para antena [${this.antenna.ip}]`);
-      }
-
-      if (closeGateTimeout) {
-        clearTimeout(closeGateTimeout);
-        closeGateTimeout = null;
-      }
-
-      healthCheckWaitResponse = false;
-      isReconnecting = false;
-      connectionRetry = 0;
-      this.unhealthySince = this.unhealthySince ?? Date.now();
-
-      setTimeout(() => {
-        this.connectToAntenna();
-      }, 300);
-
-      return true;
-    } catch (error) {
-      logger.error('[AntennaManager] Erro ao reiniciar conexão da antena', { error, antennaId: this.antenna.id });
-      return false;
-    }
-  }
-
-  /**
-   * Verifica status de saúde da antena com base no tempo de inatividade.
-   * @param nowMs Timestamp atual em ms
-   * @param maxSilenceMs Máximo de inatividade tolerada em ms
-   * @param failAfterMs Tempo para considerar falha crítica em ms
-   * @returns Snapshot do status de saúde
-   */
-  public getHealthSnapshot(
-    nowMs: number,
-    maxSilenceMs: number,
-    failAfterMs: number,
-    startupGraceMs: number
-  ): { status: 'healthy' | 'degraded' | 'unhealthy'; lastActivityAt: number | null; unhealthySince: number | null; shouldFail: boolean } {
-    const inStartupGrace = nowMs - this.startedAt < startupGraceMs;
-    const lastConnectedAt = this.lastConnectedAt;
-    const inReconnectGrace = lastConnectedAt ? nowMs - lastConnectedAt < startupGraceMs : false;
-
-    if (!this.hasEverConnected || inStartupGrace || inReconnectGrace) {
-      return {
-        status: 'healthy',
-        lastActivityAt: this.lastActivityAt,
-        unhealthySince: null,
-        shouldFail: false,
-      };
-    }
-
-    const lastActivityAt = this.lastActivityAt;
-    const silenceMs = lastActivityAt ? nowMs - lastActivityAt : null;
-
-    if (silenceMs === null || silenceMs > maxSilenceMs) {
-      if (!this.unhealthySince) {
-        this.unhealthySince = nowMs;
-      }
-    } else {
-      this.unhealthySince = null;
-    }
-
-    const unhealthySince = this.unhealthySince;
-    const shouldFail = unhealthySince !== null && nowMs - unhealthySince >= failAfterMs;
-    const status = shouldFail ? 'unhealthy' : (unhealthySince ? 'degraded' : 'healthy');
-
-    return {
-      status,
-      lastActivityAt,
-      unhealthySince,
-      shouldFail,
-    };
-  }
-
-  /**
-   * Reinicia a conexão respeitando um cooldown para evitar loops de restart.
-   * @param nowMs Timestamp atual em ms
-   * @param cooldownMs Intervalo mínimo entre reinícios
-   * @returns True se reinício foi disparado
-   */
-  public async restartConnectionIfNeeded(nowMs: number, cooldownMs: number): Promise<boolean> {
-    if (isReconnecting || this.antennaSocket?.connecting) {
-      return false;
-    }
-
-    if (this.lastRestartAt && nowMs - this.lastRestartAt < cooldownMs) {
-      return false;
-    }
-
-    return this.restartConnection();
-  }
-
-  /**
-   * Função para tratar leitura de TAG usando TagValidator e GateController
-   * @param tagNumber Número da TAG lida
-   * @param antennaName Nome da antena que leu a TAG
+   * Trata a leitura de TAG usando `TagValidator` e `GateController`.
+   * @param tagNumber Número da TAG lida.
+   * @param antennaName Nome da antena que leu a TAG.
+   * @returns void.
    */
   private async handleTagRead(tagNumber: string, antennaName: string) {
-    if (this.processingTags.has(tagNumber)) {
-      logger.debug('[TAG] Leitura ignorada por processamento em andamento', { tagNumber, antennaName });
-      return;
-    }
-
-    this.processingTags.add(tagNumber);
-
     const cachedVerifyData = this.recentAuthorizedTags.get(tagNumber);
     if (cachedVerifyData !== undefined) {
       this.logTagRead(tagNumber, true, cachedVerifyData);
       gateController.openGate();
-      this.processingTags.delete(tagNumber);
       return;
     }
 
-    try {
-      const accessContext = {
-        device: this.antenna.device,
-        direction: this.antenna.direction,
-        antennaName,
-      };
+    const accessContext = {
+      device: this.antenna.device,
+      direction: this.antenna.direction,
+      antennaName,
+    };
 
-      const result = await tagValidator.validateTag(tagNumber, accessContext);
-      if (result.isValid) {
-        this.logTagRead(tagNumber, true, result.verifyData);
-        logger.counter('AUTHORIZED');
-        this.recentAuthorizedTags.set(tagNumber, result.verifyData);
-        if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
-          const oldest = this.recentAuthorizedTags.keys().next().value;
-          if (typeof oldest === 'string') {
-            this.recentAuthorizedTags.delete(oldest);
-          }
+    const result = await tagValidator.validateTag(tagNumber, accessContext);
+    if (result.isValid) {
+      this.logTagRead(tagNumber, true, result.verifyData);
+      logger.counter('AUTHORIZED');
+      this.recentAuthorizedTags.set(tagNumber, result.verifyData);
+      if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
+        const oldest = this.recentAuthorizedTags.keys().next().value;
+        if (typeof oldest === 'string') {
+          this.recentAuthorizedTags.delete(oldest);
         }
-        await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
-        gateController.openGate();
-      } else {
-        this.logTagRead(tagNumber, false, result.verifyData, result.reason);
-        logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
       }
-    } finally {
-      this.processingTags.delete(tagNumber);
+      await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
+      gateController.openGate();
+    } else {
+      this.logTagRead(tagNumber, false, result.verifyData, result.reason);
+      logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
     }
   }
 
   /**
    * Registra log da leitura de TAG com dados do portador e status de autorização.
-   * @param tagNumber Número da TAG
-   * @param isAuthorized Status de autorização
-   * @param verifyData Dados retornados pela validação
-   * @param reason Motivo quando não autorizado
+   * @param tagNumber Número da TAG.
+   * @param isAuthorized Status de autorização.
+   * @param verifyData Dados retornados pela validação.
+   * @param reason Motivo quando não autorizado.
+   * @returns void.
    */
   private logTagRead(tagNumber: string, isAuthorized: boolean, verifyData?: AccessVerifyData, reason?: string): void {
     const nome = (verifyData?.NOME || '').toString().trim();

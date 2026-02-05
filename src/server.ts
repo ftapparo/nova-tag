@@ -15,50 +15,59 @@ if (dotenvResult.error) {
  * Bootstrap principal
  */
 async function startService(): Promise<void> {
+    // Proteções contra estados inválidos
+    process.on('uncaughtException', err => {
+        console.error('[Server] uncaughtException', err);
+        process.exit(1);
+    });
+
+    process.on('unhandledRejection', err => {
+        console.error('[Server] unhandledRejection', err);
+        process.exit(1);
+    });
+
     // Healthcheck da API externa (falha fatal)
     await checkExternalApiHealth();
 
     const tagId = process.env.TAG_ID;
     const port = Number(process.env.PORT || 4000);
 
-    if (!tagId) {
+    if (!tagId || tagId.trim() === '') {
         console.error('[Server] TAG_ID não definido (TAG1 ou TAG2)');
         process.exit(1);
     }
 
-    let antenna: AntennaConfig;
+    const antenna: AntennaConfig = (() => {
+        switch (tagId) {
+            case 'TAG1':
+                return {
+                    id: 1,
+                    name: 'TAG1',
+                    device: 9,
+                    ip: '192.168.0.236',
+                    port: 2022,
+                    direction: 'E',
+                    webserver: true,
+                    webserverPort: port,
+                };
 
-    switch (tagId) {
-        case 'TAG1':
-            antenna = {
-                id: 1,
-                name: 'TAG1',
-                device: 9,
-                ip: '192.168.0.236',
-                port: 2022,
-                direction: 'E',
-                webserver: true,
-                webserverPort: port,
-            };
-            break;
+            case 'TAG2':
+                return {
+                    id: 2,
+                    name: 'TAG2',
+                    device: 10,
+                    ip: '192.168.0.237',
+                    port: 2023,
+                    direction: 'S',
+                    webserver: true,
+                    webserverPort: port,
+                };
 
-        case 'TAG2':
-            antenna = {
-                id: 2,
-                name: 'TAG2',
-                device: 10,
-                ip: '192.168.0.237',
-                port: 2023,
-                direction: 'S',
-                webserver: true,
-                webserverPort: port,
-            };
-            break;
-
-        default:
-            console.error(`[Server] TAG_ID inválido: ${tagId}`);
-            process.exit(1);
-    }
+            default:
+                console.error(`[Server] TAG_ID inválido: ${tagId}`);
+                process.exit(1);
+        }
+    })();
 
     let antennaInstance: AntennaManager | null = null;
 
@@ -76,7 +85,7 @@ async function startService(): Promise<void> {
     }
 
     // Graceful shutdown (Docker / SIGTERM)
-    const shutdown = async (signal: string) => {
+    const shutdown = (signal: string) => {
         console.log(`[Server] Recebido ${signal}, finalizando...`);
         try {
             antennaInstance?.shutdown();
@@ -88,16 +97,6 @@ async function startService(): Promise<void> {
     process.on('SIGINT', shutdown);
     process.on('SIGTERM', shutdown);
 
-    // Proteções contra estados inválidos
-    process.on('uncaughtException', err => {
-        console.error('[Server] uncaughtException', err);
-        process.exit(1);
-    });
-
-    process.on('unhandledRejection', err => {
-        console.error('[Server] unhandledRejection', err);
-        process.exit(1);
-    });
 }
 
 /**
