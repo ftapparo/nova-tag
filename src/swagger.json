@@ -7,11 +7,11 @@
   },
   "servers": [
     {
-      "url": "http://localhost:4009",
+      "url": "http://192.168.0.252:4009",
       "description": "TAG1 - Desenvolvimento local"
     },
     {
-      "url": "http://localhost:4010",
+      "url": "http://192.168.0.252:4010",
       "description": "TAG2 - Desenvolvimento local"
     }
   ],
