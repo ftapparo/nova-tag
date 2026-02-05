@@ -22,7 +22,6 @@
   "dependencies": {
     "@logtail/node": "^0.5.2",
     "@logtail/winston": "^0.5.2",
-    "@pm2/io": "^6.1.0",
     "@types/winston": "^2.4.4",
     "winston-daily-rotate-file": "^5.0.0",
     "winston": "^3.17.0",

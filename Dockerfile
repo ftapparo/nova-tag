@@ -20,9 +20,6 @@ RUN npm run build
 # Stage 2: Production
 FROM node:20-alpine
 
-# Instala PM2 globalmente
-RUN npm install -g pm2
-
 WORKDIR /app
 
 # Copia apenas package.json para instalar dependências de produção
@@ -36,17 +33,14 @@ RUN npm install --only=production && \
 COPY --from=builder /app/dist ./dist
 COPY .env ./.env
 
-# Copia arquivo de configuração do PM2
-COPY ecosystem.config.js ./
-
 # Cria diretório para logs
 RUN mkdir -p logs
 
 # Expõe as portas das duas instâncias
-EXPOSE 4009 4010
+EXPOSE 4000
 
 # Define variáveis de ambiente padrão
 ENV NODE_ENV=production
 
-# Comando para iniciar a aplicação com PM2
-CMD ["pm2-runtime", "start", "ecosystem.config.js"]
+# Comando para iniciar a aplicação
+CMD ["node", "dist/server.js"]

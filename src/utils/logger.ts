@@ -2,11 +2,10 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import dotenv from "dotenv";
 import path from "path";
-import io from "@pm2/io";
 
 dotenv.config();
 
-const instanceName = process.argv[2] || "DEFAULT";
+const instanceName = process.env.TAG_ID || process.argv[2] || "DEFAULT";
 const logDir = path.join("logs", instanceName.toUpperCase());
 
 // Timestamp customizado
@@ -60,51 +59,45 @@ const baseLogger = winston.createLogger({
   ],
 });
 
-// Mapa de métricas únicas
-const metricsMap: Record<string, ReturnType<typeof io.metric>> = {};
-const countersMap: Record<string, ReturnType<typeof io.counter>> = {};
-
 // Adiciona métodos customizados ao logger
 const logger = Object.assign(baseLogger, {
   /**
-   * Envia uma métrica única (valor direto) para o PM2+, com nome separado por instância
+   * Registra uma métrica única (valor direto) no log local, com nome separado por instância
    * @param name Nome da métrica (sem o nome da instância)
    * @param value Valor da métrica (string ou número)
    */
   metric(name: string, value: string | number) {
     const fullName = `${name}_${instanceName}`;
-    if (!metricsMap[fullName]) {
-      metricsMap[fullName] = io.metric({ name: fullName });
+    if (process.env.DEBUG === "true") {
+      baseLogger.debug(`[Metric] ${fullName}=${value}`);
     }
-    metricsMap[fullName].set(value);
   },
 
   /**
-   * Incrementa um contador PM2+ por nome e instância
+   * Incrementa um contador por nome e instância no log local
    * @param name Nome do contador
    * @param increment Valor a ser incrementado (padrão: 1)
    */
   counter(name: string) {
     const fullName = `${name}_${instanceName}`;
-    if (!countersMap[fullName]) {
-      countersMap[fullName] = io.counter({ name: fullName });
+    if (process.env.DEBUG === "true") {
+      baseLogger.debug(`[Counter] ${fullName}+1`);
     }
-    countersMap[fullName].inc();
   },
 
   /**
-   * Envia uma issue (erro crítico) para o PM2+
+   * Registra uma issue (erro crítico) no log local
    * @param error Mensagem ou objeto Error
    * @param context Objeto adicional com contexto (opcional)
    */
   issue(error: string | Error, context: Record<string, any> = {}) {
     const err = error instanceof Error ? error : new Error(String(error));
-    io.notifyError(err, {
-      custom: {
+    baseLogger.error(
+      `[Issue] ${err.message} | context=${JSON.stringify({
         instance: instanceName,
         ...context,
-      },
-    });
+      })}`
+    );
   },
 });
 
