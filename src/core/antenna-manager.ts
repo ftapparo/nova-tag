@@ -59,9 +59,13 @@ export class AntennaManager {
   public antenna: AntennaConfig;
   public antennaSocket: net.Socket;
   private recentAuthorizedTags: Map<string, AccessVerifyData | undefined> = new Map();
+  private processingTags: Set<string> = new Set();
   private lastActivityAt: number | null = null;
   private unhealthySince: number | null = null;
   private lastRestartAt: number | null = null;
+  private startedAt: number = Date.now();
+  private hasEverConnected = false;
+  private lastConnectedAt: number | null = null;
 
   /**
    * Inicia a conexão com a antena RFID e gerencia eventos de comunicação TCP
@@ -96,6 +100,8 @@ export class AntennaManager {
       const now = Date.now();
       this.lastActivityAt = now;
       this.unhealthySince = null;
+      this.hasEverConnected = true;
+      this.lastConnectedAt = now;
 
       // Reset de variáveis de estado ao conectar
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
@@ -360,8 +366,22 @@ export class AntennaManager {
   public getHealthSnapshot(
     nowMs: number,
     maxSilenceMs: number,
-    failAfterMs: number
+    failAfterMs: number,
+    startupGraceMs: number
   ): { status: 'healthy' | 'degraded' | 'unhealthy'; lastActivityAt: number | null; unhealthySince: number | null; shouldFail: boolean } {
+    const inStartupGrace = nowMs - this.startedAt < startupGraceMs;
+    const lastConnectedAt = this.lastConnectedAt;
+    const inReconnectGrace = lastConnectedAt ? nowMs - lastConnectedAt < startupGraceMs : false;
+
+    if (!this.hasEverConnected || inStartupGrace || inReconnectGrace) {
+      return {
+        status: 'healthy',
+        lastActivityAt: this.lastActivityAt,
+        unhealthySince: null,
+        shouldFail: false,
+      };
+    }
+
     const lastActivityAt = this.lastActivityAt;
     const silenceMs = lastActivityAt ? nowMs - lastActivityAt : null;
 
@@ -392,6 +412,10 @@ export class AntennaManager {
    * @returns True se reinício foi disparado
    */
   public async restartConnectionIfNeeded(nowMs: number, cooldownMs: number): Promise<boolean> {
+    if (isReconnecting || this.antennaSocket?.connecting) {
+      return false;
+    }
+
     if (this.lastRestartAt && nowMs - this.lastRestartAt < cooldownMs) {
       return false;
     }
@@ -405,35 +429,47 @@ export class AntennaManager {
    * @param antennaName Nome da antena que leu a TAG
    */
   private async handleTagRead(tagNumber: string, antennaName: string) {
+    if (this.processingTags.has(tagNumber)) {
+      logger.debug('[TAG] Leitura ignorada por processamento em andamento', { tagNumber, antennaName });
+      return;
+    }
+
+    this.processingTags.add(tagNumber);
+
     const cachedVerifyData = this.recentAuthorizedTags.get(tagNumber);
     if (cachedVerifyData !== undefined) {
       this.logTagRead(tagNumber, true, cachedVerifyData);
       gateController.openGate();
+      this.processingTags.delete(tagNumber);
       return;
     }
 
-    const accessContext = {
-      device: this.antenna.device,
-      direction: this.antenna.direction,
-      antennaName,
-    };
+    try {
+      const accessContext = {
+        device: this.antenna.device,
+        direction: this.antenna.direction,
+        antennaName,
+      };
 
-    const result = await tagValidator.validateTag(tagNumber, accessContext);
-    if (result.isValid) {
-      this.logTagRead(tagNumber, true, result.verifyData);
-      logger.counter('AUTHORIZED');
-      this.recentAuthorizedTags.set(tagNumber, result.verifyData);
-      if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
-        const oldest = this.recentAuthorizedTags.keys().next().value;
-        if (typeof oldest === 'string') {
-          this.recentAuthorizedTags.delete(oldest);
+      const result = await tagValidator.validateTag(tagNumber, accessContext);
+      if (result.isValid) {
+        this.logTagRead(tagNumber, true, result.verifyData);
+        logger.counter('AUTHORIZED');
+        this.recentAuthorizedTags.set(tagNumber, result.verifyData);
+        if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
+          const oldest = this.recentAuthorizedTags.keys().next().value;
+          if (typeof oldest === 'string') {
+            this.recentAuthorizedTags.delete(oldest);
+          }
         }
+        await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
+        gateController.openGate();
+      } else {
+        this.logTagRead(tagNumber, false, result.verifyData, result.reason);
+        logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
       }
-      await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
-      gateController.openGate();
-    } else {
-      this.logTagRead(tagNumber, false, result.verifyData, result.reason);
-      logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
+    } finally {
+      this.processingTags.delete(tagNumber);
     }
   }
 

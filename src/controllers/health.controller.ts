@@ -14,8 +14,9 @@ export const healthCheck = async (_req: Request, res: Response, antennaInstance:
     const maxSilenceMs = Number(process.env.ANTENNA_HEALTH_SILENCE_MS) || 15000;
     const failAfterMs = Number(process.env.ANTENNA_HEALTH_FAIL_AFTER_MS) || 60000;
     const restartCooldownMs = Number(process.env.ANTENNA_HEALTH_RESTART_COOLDOWN_MS) || 15000;
+    const startupGraceMs = Number(process.env.ANTENNA_HEALTH_STARTUP_GRACE_MS) || 30000;
 
-    const snapshot = antennaInstance.getHealthSnapshot(nowMs, maxSilenceMs, failAfterMs);
+    const snapshot = antennaInstance.getHealthSnapshot(nowMs, maxSilenceMs, failAfterMs, startupGraceMs);
 
     if (snapshot.status !== 'healthy') {
         await antennaInstance.restartConnectionIfNeeded(nowMs, restartCooldownMs);
