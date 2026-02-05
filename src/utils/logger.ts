@@ -5,7 +5,7 @@ import path from "path";
 
 dotenv.config();
 
-const instanceName = process.argv[2] || "DEFAULT";
+const instanceName = process.env.TAG_ID || process.argv[2] || "DEFAULT";
 const logDir = path.join("logs", instanceName.toUpperCase());
 
 // Timestamp customizado
