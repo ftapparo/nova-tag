@@ -36,7 +36,8 @@ export const openGate = async (req: Request, res: Response, antennaInstance: Ant
             return;
         }
 
-        const result = await antennaInstance.openGate(autoCloseTime);
+        const autoCloseTimeMs = autoCloseTime !== undefined ? autoCloseTime * 1000 : undefined;
+        const result = await antennaInstance.openGate(autoCloseTimeMs);
 
         if (result === true) {
             res.ok({ message: 'Comando de abertura enviado com sucesso.' });

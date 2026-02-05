@@ -269,20 +269,30 @@ export class AntennaManager {
         return 'unknown';
     }
   }
-  public openGate(autoCloseTime?: number): boolean {
-    if (gateController) {
-      gateController.openGate(autoCloseTime);
-      return true;
+  public async openGate(autoCloseTime?: number): Promise<boolean> {
+    if (!gateController) {
+      return false;
     }
-    return false;
+
+    try {
+      return await gateController.openGate(autoCloseTime);
+    } catch (error) {
+      logger.error('[AntennaManager] Erro ao abrir portão via rota', { error, antennaId: this.antenna.id });
+      return false;
+    }
   }
 
-  public closeGate(): boolean {
-    if (gateController) {
-      gateController.closeGate();
-      return true;
+  public async closeGate(): Promise<boolean> {
+    if (!gateController) {
+      return false;
     }
-    return false;
+
+    try {
+      return await gateController.closeGate();
+    } catch (error) {
+      logger.error('[AntennaManager] Erro ao fechar portão via rota', { error, antennaId: this.antenna.id });
+      return false;
+    }
   }
 
   /**
