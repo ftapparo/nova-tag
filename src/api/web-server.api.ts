@@ -6,6 +6,7 @@ import swaggerDocument from '../swagger.json';
 
 import healthRoutes from '../routes/health.routes';
 import gateRoutes from '../routes/gate.routes';
+import cacheRoutes from '../routes/cache.routes';
 import { AntennaManager } from '../core/antenna-manager';
 import { responseHandler } from '../middleware/response-handler';
 
@@ -46,6 +47,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
      */
     app.use('/v2/api', healthRoutes);
     app.use('/v2/api', gateRoutes(antennaInstance));
+    app.use('/v2/api', cacheRoutes);
 
     /**
      * Rota para servir a documentação Swagger UI.

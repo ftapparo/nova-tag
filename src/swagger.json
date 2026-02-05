@@ -13,6 +13,10 @@
     {
       "name": "Portões",
       "description": "Funcionalidades para controle de portão: abertura, fechamento e status."
+    },
+    {
+      "name": "Lista",
+      "description": "Operações de cache de TAGs (whitelist/blacklist)."
     }
   ],
   "paths": {
@@ -197,6 +201,113 @@
                     },
                     "errors": {
                       "type": "object",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/gate/restart": {
+      "post": {
+        "tags": [
+          "Monitoramento"
+        ],
+        "summary": "Reinicia a conexão com a antena",
+        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas. Use forceRestart para encerrar o container e forçar reinício pelo Docker.",
+        "parameters": [
+          {
+            "name": "forceRestart",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "examples": {
+                "minimo": {
+                  "summary": "Mínimo",
+                  "value": {}
+                },
+                "completo": {
+                  "summary": "Completo",
+                  "value": {
+                    "forceRestart": true
+                  }
+                }
+              },
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "forceRestart": {
+                    "type": "boolean",
+                    "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Conexão reiniciada com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Conexão com a antena reiniciada com sucesso."
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha ao reiniciar conexão com a antena",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Falha ao reiniciar conexão com a antena."
+                    },
+                    "errors": {
+                      "type": "string",
                       "nullable": true,
                       "example": null
                     }
@@ -446,55 +557,34 @@
         }
       }
     },
-    "/v2/api/gate/restart": {
-      "post": {
+    "/v2/api/cache": {
+      "get": {
         "tags": [
-          "Portões"
+          "Lista"
         ],
-        "summary": "Reinicia a conexão com a antena",
-        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas. Use forceRestart para encerrar o container e forçar reinício pelo Docker.",
+        "summary": "Lista o cache de TAGs",
+        "description": "Lista o cache de TAGs. Use type=positive|negative|all|whitelist|blacklist.",
         "parameters": [
           {
-            "name": "forceRestart",
+            "name": "type",
             "in": "query",
             "required": false,
             "schema": {
-              "type": "boolean"
+              "type": "string",
+              "enum": [
+                "positive",
+                "negative",
+                "all",
+                "whitelist",
+                "blacklist"
+              ]
             },
-            "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
+            "description": "Tipo de cache a listar."
           }
         ],
-        "requestBody": {
-          "required": false,
-          "content": {
-            "application/json": {
-              "examples": {
-                "minimo": {
-                  "summary": "Mínimo",
-                  "value": {}
-                },
-                "completo": {
-                  "summary": "Completo",
-                  "value": {
-                    "forceRestart": true
-                  }
-                }
-              },
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "forceRestart": {
-                    "type": "boolean",
-                    "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
-                  }
-                }
-              }
-            }
-          }
-        },
         "responses": {
           "200": {
-            "description": "Conexão reiniciada com sucesso",
+            "description": "Cache listado com sucesso",
             "content": {
               "application/json": {
                 "schema": {
@@ -503,9 +593,71 @@
                     "data": {
                       "type": "object",
                       "properties": {
-                        "message": {
+                        "type": {
                           "type": "string",
-                          "example": "Conexão com a antena reiniciada com sucesso."
+                          "example": "positive"
+                        },
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "tag": {
+                                "type": "string",
+                                "example": "005646665"
+                              },
+                              "validatedAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "isValid": {
+                                "type": "boolean",
+                                "example": true
+                              },
+                              "accessId": {
+                                "type": "string",
+                                "nullable": true,
+                                "example": "123456"
+                              },
+                              "verifyData": {
+                                "type": "object",
+                                "nullable": true,
+                                "example": {
+                                  "PERMITIDO": "S",
+                                  "NOME": "IGOR JOSE LIMA ROZANI",
+                                  "MIDIA": "TAG",
+                                  "DESCRICAO": "3 INQUILINO"
+                                }
+                              }
+                            }
+                          }
+                        },
+                        "stats": {
+                          "type": "object",
+                          "properties": {
+                            "positiveSize": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "negativeSize": {
+                              "type": "integer",
+                              "example": 1
+                            },
+                            "positiveTimeout": {
+                              "type": "integer",
+                              "example": 300000
+                            },
+                            "negativeTimeout": {
+                              "type": "integer",
+                              "example": 60000
+                            }
+                          },
+                          "example": {
+                            "positiveSize": 1,
+                            "negativeSize": 1,
+                            "positiveTimeout": 300000,
+                            "negativeTimeout": 60000
+                          }
                         }
                       }
                     },
@@ -524,8 +676,8 @@
               }
             }
           },
-          "500": {
-            "description": "Falha ao reiniciar conexão com a antena",
+          "400": {
+            "description": "Tipo de cache inválido",
             "content": {
               "application/json": {
                 "schema": {
@@ -538,7 +690,282 @@
                     },
                     "message": {
                       "type": "string",
-                      "example": "Falha ao reiniciar conexão com a antena."
+                      "example": "Tipo de cache inválido. Use positive, negative, all, whitelist ou blacklist."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TagValidator indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "TagValidator indisponível."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Lista"
+        ],
+        "summary": "Limpa o cache de TAGs",
+        "description": "Limpa o cache de TAGs. Use type=positive|negative|all|whitelist|blacklist.",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "positive",
+                "negative",
+                "all",
+                "whitelist",
+                "blacklist"
+              ]
+            },
+            "description": "Tipo de cache a limpar."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cache limpo com sucesso",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Cache limpo com sucesso."
+                        },
+                        "type": {
+                          "type": "string",
+                          "example": "negative"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Tipo de cache inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Tipo de cache inválido. Use positive, negative, all, whitelist ou blacklist."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TagValidator indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "TagValidator indisponível."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v2/api/cache/{tag}": {
+      "delete": {
+        "tags": [
+          "Lista"
+        ],
+        "summary": "Remove uma TAG do cache",
+        "description": "Remove uma TAG específica do cache (whitelist/blacklist).",
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "description": "TAG a ser removida do cache."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TAG removida do cache",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "TAG removida do cache com sucesso."
+                        },
+                        "tag": {
+                          "type": "string",
+                          "example": "005017758"
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "TAG inválida",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "TAG inválida."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "TAG não encontrada no cache",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "TAG não encontrada no cache."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "TagValidator indisponível",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "TagValidator indisponível."
                     },
                     "errors": {
                       "type": "string",

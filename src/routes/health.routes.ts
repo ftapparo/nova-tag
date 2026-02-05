@@ -1,12 +1,19 @@
 import express from 'express';
-import { healthCheck } from '../controllers/health.controller';
+import { healthCheck, restartAntennaConnection } from '../controllers/health.controller';
+import { AntennaManager } from '../core/antenna-manager';
 
-const router = express.Router();
+export default (antennaInstance: AntennaManager) => {
 
-// Rota de health check
-router.get('/health', healthCheck);
+    const router = express.Router();
 
-// Rota de health check alternativa
-router.get('/healthcheck', healthCheck);
+    // Rota de health check
+    router.get('/health', healthCheck);
 
-export default router;
+    // Rota de health check alternativa
+    router.get('/healthcheck', healthCheck);
+
+    // Rota para reiniciar a conexão com a antena
+    router.post('/gate/restart', (req: express.Request, res: express.Response) => restartAntennaConnection(req, res, antennaInstance));
+
+    return router;
+};

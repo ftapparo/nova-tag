@@ -63,23 +63,28 @@ export interface AccessContext {
  * Classe responsável por validar TAGs RFID, gerenciar cache e registrar acessos.
  */
 export class TagValidator {
-    private tagCache: Map<string, TagCache> = new Map();
-    private readonly cacheTimeout: number;
+    private positiveTagCache: Map<string, TagCache> = new Map();
+    private negativeTagCache: Map<string, TagCache> = new Map();
+    private readonly positiveCacheTimeout: number;
+    private readonly negativeCacheTimeout: number;
     private readonly apiBaseUrl: string;
     private readonly apiTimeout: number;
 
     /**
      * Cria uma instância do validador de TAGs
-     * @param cacheTimeout Tempo de cache em ms (default 5min)
+     * @param positiveCacheTimeout Tempo de cache positivo em ms (default 5min)
+     * @param negativeCacheTimeout Tempo de cache negativo em ms (default 1min)
      * @param apiBaseUrl URL base da API de validação
      * @param apiTimeout Timeout da requisição à API em ms
      */
     constructor(
-        cacheTimeout: number = 300000, // 5 minutos
+        positiveCacheTimeout: number = 300000, // 5 minutos
+        negativeCacheTimeout: number = 60000, // 1 minuto
         apiBaseUrl: string = process.env.API_BASE_URL || 'https://api.condominionovaresidence.com/v2/api',
         apiTimeout: number = 5000 // 5 segundos
     ) {
-        this.cacheTimeout = cacheTimeout;
+        this.positiveCacheTimeout = positiveCacheTimeout;
+        this.negativeCacheTimeout = negativeCacheTimeout;
         this.apiBaseUrl = apiBaseUrl;
         this.apiTimeout = apiTimeout;
     }
@@ -173,7 +178,7 @@ export class TagValidator {
      * @returns Cache ou null se expirado
      */
     private getCachedValidation(tag: string): TagCache | null {
-        const cached = this.tagCache.get(tag);
+        const cached = this.positiveTagCache.get(tag) || this.negativeTagCache.get(tag);
 
         if (!cached) {
             return null;
@@ -181,9 +186,14 @@ export class TagValidator {
 
         const now = new Date();
         const cacheAge = now.getTime() - cached.validatedAt.getTime();
+        const cacheTimeout = cached.isValid ? this.positiveCacheTimeout : this.negativeCacheTimeout;
 
-        if (cacheAge > this.cacheTimeout) {
-            this.tagCache.delete(tag);
+        if (cacheAge > cacheTimeout) {
+            if (cached.isValid) {
+                this.positiveTagCache.delete(tag);
+            } else {
+                this.negativeTagCache.delete(tag);
+            }
             return null;
         }
 
@@ -309,7 +319,11 @@ export class TagValidator {
      * @param isValid Resultado da validação
      */
     private updateCache(tag: string, isValid: boolean, accessId?: string, verifyData?: AccessVerifyData): void {
-        this.tagCache.set(tag, {
+        const targetCache = isValid ? this.positiveTagCache : this.negativeTagCache;
+        const otherCache = isValid ? this.negativeTagCache : this.positiveTagCache;
+
+        otherCache.delete(tag);
+        targetCache.set(tag, {
             tag,
             validatedAt: new Date(),
             isValid,
@@ -318,10 +332,10 @@ export class TagValidator {
         });
 
         // Limitar tamanho do cache (máximo 100 TAGs)
-        if (this.tagCache.size > 100) {
-            const oldestKey = this.tagCache.keys().next().value;
+        if (targetCache.size > 100) {
+            const oldestKey = targetCache.keys().next().value;
             if (typeof oldestKey === 'string') {
-                this.tagCache.delete(oldestKey);
+                targetCache.delete(oldestKey);
             }
         }
     }
@@ -422,14 +436,24 @@ export class TagValidator {
         const now = new Date();
         const expiredKeys: string[] = [];
 
-        for (const [key, cached] of this.tagCache.entries()) {
+        for (const [key, cached] of this.positiveTagCache.entries()) {
             const cacheAge = now.getTime() - cached.validatedAt.getTime();
-            if (cacheAge > this.cacheTimeout) {
+            if (cacheAge > this.positiveCacheTimeout) {
                 expiredKeys.push(key);
             }
         }
 
-        expiredKeys.forEach(key => this.tagCache.delete(key));
+        for (const [key, cached] of this.negativeTagCache.entries()) {
+            const cacheAge = now.getTime() - cached.validatedAt.getTime();
+            if (cacheAge > this.negativeCacheTimeout) {
+                expiredKeys.push(key);
+            }
+        }
+
+        expiredKeys.forEach(key => {
+            this.positiveTagCache.delete(key);
+            this.negativeTagCache.delete(key);
+        });
 
         if (expiredKeys.length > 0) {
             logger.info('[TagValidator] Limpeza de cache expirada', { quantidade: expiredKeys.length });
@@ -437,13 +461,40 @@ export class TagValidator {
     }
 
     /**
+     * Lista entradas do cache conforme o tipo solicitado.
+     * @param type Tipo de cache (positive, negative ou all).
+     * @returns Lista de entradas do cache.
+     */
+    listCache(type: 'positive' | 'negative' | 'all' = 'all'): TagCache[] {
+        const toArray = (cache: Map<string, TagCache>): TagCache[] =>
+            Array.from(cache.values()).map(entry => ({ ...entry }));
+
+        if (type === 'positive') {
+            return toArray(this.positiveTagCache);
+        }
+
+        if (type === 'negative') {
+            return toArray(this.negativeTagCache);
+        }
+
+        return [...toArray(this.positiveTagCache), ...toArray(this.negativeTagCache)];
+    }
+
+    /**
      * Retorna estatísticas do cache
      * @returns Quantidade de entradas e timeout
      */
-    getCacheStats(): { size: number; timeout: number } {
+    getCacheStats(): {
+        positiveSize: number;
+        negativeSize: number;
+        positiveTimeout: number;
+        negativeTimeout: number;
+    } {
         return {
-            size: this.tagCache.size,
-            timeout: this.cacheTimeout
+            positiveSize: this.positiveTagCache.size,
+            negativeSize: this.negativeTagCache.size,
+            positiveTimeout: this.positiveCacheTimeout,
+            negativeTimeout: this.negativeCacheTimeout
         };
     }
 
@@ -454,14 +505,23 @@ export class TagValidator {
      */
     invalidateTag(tag: string): boolean {
         const sanitizedTag = this.sanitizeTag(tag);
-        return this.tagCache.delete(sanitizedTag);
+        const removedPositive = this.positiveTagCache.delete(sanitizedTag);
+        const removedNegative = this.negativeTagCache.delete(sanitizedTag);
+        return removedPositive || removedNegative;
     }
 
     /**
      * Limpa todo o cache de validação
      */
-    clearCache(): void {
-        this.tagCache.clear();
-        logger.info('[TagValidator] Cache de validação limpo');
+    clearCache(type: 'positive' | 'negative' | 'all' = 'all'): void {
+        if (type === 'positive' || type === 'all') {
+            this.positiveTagCache.clear();
+        }
+
+        if (type === 'negative' || type === 'all') {
+            this.negativeTagCache.clear();
+        }
+
+        logger.info('[TagValidator] Cache de validação limpo', { type });
     }
 }

@@ -52,13 +52,19 @@ let connectionRetry = 0;
 
 // Variáveis globais para instâncias de GateController e TagValidator
 let gateController: GateController;
-let tagValidator: TagValidator;
+let tagValidator: TagValidator | null = null;
 
 /**
  * Indica se o último healthcheck da antena ainda aguarda resposta.
  * @returns `true` quando há healthcheck pendente.
  */
 export const isHealthcheckAwaitingResponse = (): boolean => healthCheckWaitResponse;
+
+/**
+ * Retorna a instância atual do TagValidator, se disponível.
+ * @returns Instância do TagValidator ou null quando indisponível.
+ */
+export const getTagValidatorInstance = (): TagValidator | null => tagValidator;
 
 /**
  * Gerencia a conexão TCP com a antena RFID e a lógica de operação do portão.
@@ -371,6 +377,11 @@ export class AntennaManager {
       direction: this.antenna.direction,
       antennaName,
     };
+
+    if (!tagValidator) {
+      logger.error('[AntennaManager] TagValidator não inicializado', { antenna: this.antenna.name });
+      return;
+    }
 
     const result = await tagValidator.validateTag(tagNumber, accessContext);
     if (result.isValid) {
