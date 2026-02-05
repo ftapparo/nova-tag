@@ -17,33 +17,52 @@
   ],
   "tags": [
     {
-      "name": "Healthcheck",
-      "description": "Verificações de status da aplicação"
+      "name": "Monitoramento",
+      "description": "Verificacao de status e saude da API (health check)."
     },
     {
       "name": "Gate",
-      "description": "Funcionalidades para controle de portão: abertura, fechamento e status"
+      "description": "Funcionalidades para controle de portão: abertura, fechamento e status."
     }
   ],
   "paths": {
-    "/health": {
+    "/v2/api/health": {
       "get": {
         "tags": [
-          "Healthcheck"
+          "Monitoramento"
         ],
-        "summary": "Verifica o status da API",
-        "description": "Endpoint para verificar o status da API e suas dependências",
+        "summary": "Verificacao de status da API",
+        "description": "Retorna o status de funcionamento da API e o ambiente atual.",
         "responses": {
           "200": {
-            "description": "API funcionando corretamente",
+            "description": "API em funcionamento",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "API Funcionando!"
+                        },
+                        "environment": {
+                          "type": "string",
+                          "example": "development"
+                        }
+                      }
+                    },
+                    "message": {
                       "type": "string",
-                      "example": "OK"
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -53,24 +72,43 @@
         }
       }
     },
-    "/healthcheck": {
+    "/v2/api/healthcheck": {
       "get": {
         "tags": [
-          "Healthcheck"
+          "Monitoramento"
         ],
-        "summary": "Verifica o status da API",
-        "description": "Endpoint alternativo para verificar o status da API",
+        "summary": "Verificacao de status da API",
+        "description": "Retorna o status de funcionamento da API e o ambiente atual.",
         "responses": {
           "200": {
-            "description": "API funcionando corretamente",
+            "description": "API em funcionamento",
             "content": {
               "application/json": {
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "status": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "API Funcionando!"
+                        },
+                        "environment": {
+                          "type": "string",
+                          "example": "development"
+                        }
+                      }
+                    },
+                    "message": {
                       "type": "string",
-                      "example": "OK"
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -80,13 +118,13 @@
         }
       }
     },
-    "/gate/state": {
+    "/v2/api/gate/state": {
       "get": {
         "tags": [
           "Gate"
         ],
         "summary": "Obtém o estado atual do portão",
-        "description": "Retorna o estado atual do portão (OPEN, CLOSED, UNKNOWN)",
+        "description": "Retorna o estado atual do portão (OPEN, CLOSED, UNKNOWN).",
         "responses": {
           "200": {
             "description": "Estado atual do portão",
@@ -95,14 +133,29 @@
                 "schema": {
                   "type": "object",
                   "properties": {
-                    "state": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "OPEN",
+                            "CLOSED",
+                            "UNKNOWN"
+                          ],
+                          "example": "CLOSED"
+                        }
+                      }
+                    },
+                    "message": {
                       "type": "string",
-                      "enum": [
-                        "OPEN",
-                        "CLOSED",
-                        "UNKNOWN"
-                      ],
-                      "example": "CLOSED"
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -112,13 +165,13 @@
         }
       }
     },
-    "/gate/open": {
+    "/v2/api/gate/open": {
       "post": {
         "tags": [
           "Gate"
         ],
         "summary": "Abre o portão",
-        "description": "Envia comando para abrir o portão sem tempo de fechamento automático",
+        "description": "Envia comando para abrir o portão sem tempo de fechamento automático.",
         "responses": {
           "200": {
             "description": "Comando de abertura enviado com sucesso",
@@ -127,9 +180,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Comando de abertura enviado com sucesso."
+                        }
+                      }
+                    },
                     "message": {
                       "type": "string",
-                      "example": "Comando de abertura enviado com sucesso."
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -143,9 +211,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
                     "message": {
                       "type": "string",
                       "example": "Falha ao enviar comando para abrir o portão."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -155,13 +233,13 @@
         }
       }
     },
-    "/gate/open/{autoCloseTime}": {
+    "/v2/api/gate/open/{autoCloseTime}": {
       "post": {
         "tags": [
           "Gate"
         ],
         "summary": "Abre o portão com fechamento automático",
-        "description": "Envia comando para abrir o portão com tempo definido em segundos para fechamento automático",
+        "description": "Envia comando para abrir o portão com tempo definido em segundos para fechamento automático.",
         "parameters": [
           {
             "name": "autoCloseTime",
@@ -183,9 +261,50 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Comando de abertura enviado com sucesso."
+                        }
+                      }
+                    },
                     "message": {
                       "type": "string",
-                      "example": "Comando de abertura enviado com sucesso."
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Parâmetro inválido",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Parâmetro autoCloseTime inválido. Informe um número inteiro."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -199,9 +318,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
                     "message": {
                       "type": "string",
                       "example": "Falha ao enviar comando para abrir o portão."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -211,13 +340,13 @@
         }
       }
     },
-    "/gate/close": {
+    "/v2/api/gate/close": {
       "post": {
         "tags": [
           "Gate"
         ],
         "summary": "Fecha o portão",
-        "description": "Envia comando para fechar o portão imediatamente",
+        "description": "Envia comando para fechar o portão imediatamente.",
         "responses": {
           "200": {
             "description": "Comando de fechamento enviado com sucesso",
@@ -226,9 +355,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Comando de fechamento enviado com sucesso."
+                        }
+                      }
+                    },
                     "message": {
                       "type": "string",
-                      "example": "Comando de fechamento enviado com sucesso."
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -242,9 +386,19 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
                     "message": {
                       "type": "string",
                       "example": "Falha ao enviar comando para fechar o portão."
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }
@@ -254,13 +408,13 @@
         }
       }
     },
-    "/gate/restart": {
+    "/v2/api/gate/restart": {
       "post": {
         "tags": [
           "Gate"
         ],
         "summary": "Reinicia a conexão com a antena",
-        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas",
+        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas.",
         "responses": {
           "200": {
             "description": "Conexão reiniciada com sucesso",
@@ -269,9 +423,24 @@
                 "schema": {
                   "type": "object",
                   "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "message": {
+                          "type": "string",
+                          "example": "Conexão com a antena reiniciada com sucesso."
+                        }
+                      }
+                    },
                     "message": {
                       "type": "string",
-                      "example": "Conexão com a antena reiniciada com sucesso."
+                      "nullable": true,
+                      "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
                     }
                   }
                 }

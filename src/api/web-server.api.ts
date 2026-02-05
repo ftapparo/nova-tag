@@ -7,6 +7,8 @@ import swaggerDocument from '../swagger.json';
 import healthRoutes from '../routes/health.routes';
 import gateRoutes from '../routes/gate.routes';
 import { AntennaManager } from '../core/antenna-manager';
+import { responseHandler } from '../middleware/response-handler';
+
 
 export async function StartWebServer(antennaInstance: AntennaManager): Promise<void> {
     const app = express();
@@ -18,6 +20,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
     app.use(cors({
         origin: '*',
         methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+        allowedHeaders: '*',
         credentials: true
     }));
 
@@ -25,6 +28,11 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
      * Middleware para parsear JSON nas requisições.
      */
     app.use(express.json());
+
+    /**
+     * Middleware para padronizar respostas da API.
+     */
+    app.use(responseHandler);
 
     /**
      * Registro das rotas principais da API.
@@ -51,7 +59,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
      * Middleware para tratar rotas não encontradas (404).
      */
     app.use((_req, res) => {
-        res.status(404).send();
+        res.fail('Rota não encontrada.', 404);
     });
 
     /**
