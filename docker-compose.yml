@@ -1,15 +1,46 @@
 services:
-  nova-tag:
+  # nova-tag-tag1:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: nova-tag-tag1
+  #   restart: unless-stopped
+  #   ports:
+  #     - "4009:4000"
+  #   environment:
+  #     - NODE_ENV=production
+  #     - TAG_ID=TAG1
+  #     - PORT=4000
+  #   env_file:
+  #     - .env
+  #   volumes:
+  #     - /mnt/windows/nova-tag/logs:/app/logs
+  #   networks:
+  #     - nova-network
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:4000/v2/api/healthcheck || exit 1"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #     start_period: 40s
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "10m"
+  #       max-file: "3"
+
+  nova-tag-tag2:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: nova-tag
+    container_name: nova-tag-tag2
     restart: unless-stopped
     ports:
-      # - "4009:4009"  # Porta do webserver TAG1
-      - "4010:4010"  # Porta do webserver TAG2
+      - "4010:4000"   
     environment:
       - NODE_ENV=production
+      - TAG_ID=TAG2
+      - PORT=4000
     env_file:
       - .env
     volumes:
@@ -17,8 +48,7 @@ services:
     networks:
       - nova-network
     healthcheck:
-      # test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4009/health && wget --quiet --tries=1 --spider http://localhost:4010/health"]
-      test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4010/v2/api/healthcheck"]
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:4000/v2/api/healthcheck || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
