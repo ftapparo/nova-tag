@@ -1,12 +1,19 @@
 import express from 'express';
 import { healthCheck } from '../controllers/health.controller';
+import { AntennaManager } from '../core/antenna-manager';
 
-const router = express.Router();
+export default (antennaInstance: AntennaManager) => {
+    const router = express.Router();
 
-// Rota de health check
-router.get('/health', healthCheck);
+    const healthControl = {
+        healthCheck: (req: express.Request, res: express.Response) => healthCheck(req, res, antennaInstance),
+    };
 
-// Rota de health check alternativa
-router.get('/healthcheck', healthCheck);
+    // Rota de health check
+    router.get('/health', healthControl.healthCheck);
 
-export default router;
+    // Rota de health check alternativa
+    router.get('/healthcheck', healthControl.healthCheck);
+
+    return router;
+};

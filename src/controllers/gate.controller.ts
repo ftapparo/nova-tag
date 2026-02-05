@@ -84,9 +84,27 @@ export const closeGate = async (req: Request, res: Response, antennaInstance: An
 
 /**
  * Reinicia a conexão com a antena.
- * @param req 
- * @param res 
+ * @param req Request do Express
+ * @param res Response do Express
+ * @param antennaInstance Instância da AntennaManager correspondente
+ * @returns Retorna mensagem de sucesso ou erro
  */
-export const restartAntennaConnection = (req: Request, res: Response, antennaInstance: AntennaManager): void => {
-    res.ok({ message: 'Conexão com a antena reiniciada com sucesso.' });
+export const restartAntennaConnection = async (req: Request, res: Response, antennaInstance: AntennaManager): Promise<void> => {
+    try {
+        if (!antennaInstance.restartConnection) {
+            res.fail('Falha de implementação do método restartConnection.', 500);
+            return;
+        }
+
+        const result = await antennaInstance.restartConnection();
+
+        if (result === true) {
+            res.ok({ message: 'Conexão com a antena reiniciada com sucesso.' });
+        } else {
+            res.fail('Falha ao reiniciar conexão com a antena.', 500);
+        }
+    } catch (error) {
+        console.error('[GateController] Erro ao reiniciar conexão com a antena:', error);
+        res.fail('Erro inesperado ao reiniciar a conexão com a antena.', 500, error instanceof Error ? error.message : error);
+    }
 };

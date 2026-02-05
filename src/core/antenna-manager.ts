@@ -59,6 +59,9 @@ export class AntennaManager {
   public antenna: AntennaConfig;
   public antennaSocket: net.Socket;
   private recentAuthorizedTags: Map<string, AccessVerifyData | undefined> = new Map();
+  private lastActivityAt: number | null = null;
+  private unhealthySince: number | null = null;
+  private lastRestartAt: number | null = null;
 
   /**
    * Inicia a conexão com a antena RFID e gerencia eventos de comunicação TCP
@@ -90,6 +93,10 @@ export class AntennaManager {
     // Evento da conexão do socket
     client.connect(this.antenna.port, this.antenna.ip, () => {
 
+      const now = Date.now();
+      this.lastActivityAt = now;
+      this.unhealthySince = null;
+
       // Reset de variáveis de estado ao conectar
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
       gateState = GateState.CLOSED;     //estado do portão fechado
@@ -119,6 +126,8 @@ export class AntennaManager {
 
     // Evento ao receber dados do socket
     client.on("data", async (data) => {
+
+      this.lastActivityAt = Date.now();
 
       const hexData = data.toString("hex");   // Converte os dados recebidos para hexadecimal
       connectionRetry = 0;                    // Reseta o contador de tentativas de conexão
@@ -199,6 +208,9 @@ export class AntennaManager {
         setTimeout(() => {
           if (healthCheckWaitResponse) {
             logger.issue(`[ERROR] A dispositivo excedeu o tempo de resposta`);
+            if (!this.unhealthySince) {
+              this.unhealthySince = Date.now();
+            }
             setImmediate(() => this.antennaSocket.destroy());
           }
         }, 3000);
@@ -207,6 +219,10 @@ export class AntennaManager {
 
     // Evento de desconexão do socket
     client.on("close", () => {
+
+      if (!this.unhealthySince) {
+        this.unhealthySince = Date.now();
+      }
 
       if (connectionRetry > ATTEMPT_RECONNECT) {
         logger.issue("[ERROR] Excedido o número de tentativas de reconexão");
@@ -232,6 +248,9 @@ export class AntennaManager {
     client.on("error", (err) => {
       if (!this.antennaSocket.destroyed) {
         logger.issue(`[ERROR] Antena [${this.antenna.ip}]: ${err.message}`);
+        if (!this.unhealthySince) {
+          this.unhealthySince = Date.now();
+        }
         this.antennaSocket.destroy();
       }
     });
@@ -293,6 +312,91 @@ export class AntennaManager {
       logger.error('[AntennaManager] Erro ao fechar portão via rota', { error, antennaId: this.antenna.id });
       return false;
     }
+  }
+
+  /**
+   * Reinicia a conexão TCP com a antena RFID.
+   * Força o encerramento do socket atual e tenta reconectar.
+   * @returns Retorna true se o fluxo de reinício foi disparado
+   */
+  public async restartConnection(): Promise<boolean> {
+    try {
+      this.lastRestartAt = Date.now();
+      if (this.antennaSocket && !this.antennaSocket.destroyed) {
+        logger.warn(`[RESTART] Reiniciando conexão da antena [${this.antenna.ip}]`);
+        this.antennaSocket.destroy();
+      } else {
+        logger.warn(`[RESTART] Socket já estava encerrado para antena [${this.antenna.ip}]`);
+      }
+
+      if (closeGateTimeout) {
+        clearTimeout(closeGateTimeout);
+        closeGateTimeout = null;
+      }
+
+      healthCheckWaitResponse = false;
+      isReconnecting = false;
+      connectionRetry = 0;
+      this.unhealthySince = this.unhealthySince ?? Date.now();
+
+      setTimeout(() => {
+        this.connectToAntenna();
+      }, 300);
+
+      return true;
+    } catch (error) {
+      logger.error('[AntennaManager] Erro ao reiniciar conexão da antena', { error, antennaId: this.antenna.id });
+      return false;
+    }
+  }
+
+  /**
+   * Verifica status de saúde da antena com base no tempo de inatividade.
+   * @param nowMs Timestamp atual em ms
+   * @param maxSilenceMs Máximo de inatividade tolerada em ms
+   * @param failAfterMs Tempo para considerar falha crítica em ms
+   * @returns Snapshot do status de saúde
+   */
+  public getHealthSnapshot(
+    nowMs: number,
+    maxSilenceMs: number,
+    failAfterMs: number
+  ): { status: 'healthy' | 'degraded' | 'unhealthy'; lastActivityAt: number | null; unhealthySince: number | null; shouldFail: boolean } {
+    const lastActivityAt = this.lastActivityAt;
+    const silenceMs = lastActivityAt ? nowMs - lastActivityAt : null;
+
+    if (silenceMs === null || silenceMs > maxSilenceMs) {
+      if (!this.unhealthySince) {
+        this.unhealthySince = nowMs;
+      }
+    } else {
+      this.unhealthySince = null;
+    }
+
+    const unhealthySince = this.unhealthySince;
+    const shouldFail = unhealthySince !== null && nowMs - unhealthySince >= failAfterMs;
+    const status = shouldFail ? 'unhealthy' : (unhealthySince ? 'degraded' : 'healthy');
+
+    return {
+      status,
+      lastActivityAt,
+      unhealthySince,
+      shouldFail,
+    };
+  }
+
+  /**
+   * Reinicia a conexão respeitando um cooldown para evitar loops de restart.
+   * @param nowMs Timestamp atual em ms
+   * @param cooldownMs Intervalo mínimo entre reinícios
+   * @returns True se reinício foi disparado
+   */
+  public async restartConnectionIfNeeded(nowMs: number, cooldownMs: number): Promise<boolean> {
+    if (this.lastRestartAt && nowMs - this.lastRestartAt < cooldownMs) {
+      return false;
+    }
+
+    return this.restartConnection();
   }
 
   /**
