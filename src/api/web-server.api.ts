@@ -27,7 +27,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
     /**
      * Middleware para tratar requisições OPTIONS (CORS Preflight).
      */
-    app.options('/*', cors());
+    app.options(/.*/, cors());
 
     /**
      * Middleware para parsear JSON nas requisições.
