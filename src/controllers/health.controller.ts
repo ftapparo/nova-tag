@@ -8,5 +8,5 @@ import { Request, Response } from 'express';
  */
 export const healthCheck = (_req: Request, res: Response) => {
     const env = process.env.NODE_ENV || 'UNKNOWN';
-    res.status(200).json({ content: 'API Funcionando! - Ambiente: ' + env });
+    res.ok({ status: 'API Funcionando!', environment: env });
 };
