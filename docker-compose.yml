@@ -6,7 +6,7 @@ services:
     container_name: nova-tag
     restart: unless-stopped
     ports:
-      - "4009:4009"  # Porta do webserver TAG1
+      # - "4009:4009"  # Porta do webserver TAG1
       - "4010:4010"  # Porta do webserver TAG2
     environment:
       - NODE_ENV=production
@@ -17,7 +17,8 @@ services:
     networks:
       - nova-tag-network
     healthcheck:
-      test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4009/health && wget --quiet --tries=1 --spider http://localhost:4010/health"]
+      # test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4009/health && wget --quiet --tries=1 --spider http://localhost:4010/health"]
+      test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4010/v2/api/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3

@@ -31,8 +31,8 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
      * - /api/health: Healthcheck
      * - /api/gate: Controle de Portão
      */
-    app.use('/api', healthRoutes);
-    app.use('/api', gateRoutes(antennaInstance));
+    app.use('/v2/api', healthRoutes);
+    app.use('/v2/api', gateRoutes(antennaInstance));
 
     /**
      * Rota para servir a documentação Swagger UI.
