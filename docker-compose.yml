@@ -15,7 +15,7 @@ services:
     volumes:
       - /mnt/windows/nova-tag/logs:/app/logs
     networks:
-      - nova-tag-network
+      - nova-network
     healthcheck:
       # test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4009/health && wget --quiet --tries=1 --spider http://localhost:4010/health"]
       test: ["CMD", "sh", "-c", "wget --quiet --tries=1 --spider http://localhost:4010/v2/api/healthcheck"]
@@ -30,5 +30,5 @@ services:
         max-file: "3"
 
 networks:
-  nova-tag-network:
+  nova-network:
     driver: bridge

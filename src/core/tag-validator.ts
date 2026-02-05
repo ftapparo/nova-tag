@@ -199,7 +199,7 @@ export class TagValidator {
                     params: {
                         id: tag,
                         dispositivo: context.device,
-                        foto: context.photo ?? null,
+                        foto: null,
                         sentido: context.direction
                     },
                     headers: {
