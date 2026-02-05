@@ -1,3 +1,4 @@
+import axios from 'axios';
 import dotenv from 'dotenv';
 import { StartWebServer } from './api/web-server.api';
 import { AntennaManager, AntennaConfig } from './core/antenna-manager';
@@ -10,6 +11,8 @@ dotenv.config();
  * Cada instância de AntennaManager gerencia uma antena específica.
  */
 async function StartService(): Promise<void> {
+
+    await checkExternalApiHealth();
 
     let antenna: AntennaConfig;
 
@@ -63,6 +66,30 @@ async function StartService(): Promise<void> {
         console.error(`[Server] Erro ao inicializar a antena ${antenna.id}:`, err);
         process.exit(1);
     }
+}
+
+/**
+ * Executa healthcheck na API externa antes de iniciar o serviço
+ */
+async function checkExternalApiHealth(): Promise<void> {
+    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    const timeout = Number(process.env.API_HEALTHCHECK_TIMEOUT) || 5000;
+    const endpoints = ['/healthcheck', '/health'];
+
+    console.log('[Server] Verificando healthcheck da API externa...');
+
+    for (const endpoint of endpoints) {
+        try {
+            await axios.get(`${apiBaseUrl}${endpoint}`, { timeout });
+            console.log(`[Server] Healthcheck OK em ${apiBaseUrl}${endpoint}`);
+            return;
+        } catch (error) {
+            console.error(`[Server] Falha no healthcheck em ${apiBaseUrl}${endpoint}:`, error);
+        }
+    }
+
+    console.error('[Server] Healthcheck da API externa falhou. Encerrando aplicação.');
+    process.exit(1);
 }
 
 // Inicia o serviço
