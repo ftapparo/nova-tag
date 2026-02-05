@@ -27,8 +27,12 @@ export const openGate = async (req: Request, res: Response, antennaInstance: Ant
             return;
         }
 
-        const autoCloseTime = req.params.autoCloseTime
-            ? parseInt(Array.isArray(req.params.autoCloseTime) ? req.params.autoCloseTime[0] : req.params.autoCloseTime, 10)
+        const rawAutoCloseTime = req.body?.autoCloseTime;
+        const autoCloseTime = rawAutoCloseTime !== undefined
+            ? parseInt(
+                Array.isArray(rawAutoCloseTime) ? rawAutoCloseTime[0] : rawAutoCloseTime.toString(),
+                10
+            )
             : undefined;
 
         if (autoCloseTime !== undefined && Number.isNaN(autoCloseTime)) {
@@ -37,7 +41,8 @@ export const openGate = async (req: Request, res: Response, antennaInstance: Ant
         }
 
         const autoCloseTimeMs = autoCloseTime !== undefined ? autoCloseTime * 1000 : undefined;
-        const result = await antennaInstance.openGate(autoCloseTimeMs);
+        const keepOpen = autoCloseTime === undefined;
+        const result = await antennaInstance.openGate(autoCloseTimeMs, { keepOpen });
 
         if (result === true) {
             res.ok({ message: 'Comando de abertura enviado com sucesso.' });

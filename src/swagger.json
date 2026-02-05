@@ -171,88 +171,36 @@
           "Portões"
         ],
         "summary": "Abre o portão",
-        "description": "Envia comando para abrir o portão sem tempo de fechamento automático.",
-        "responses": {
-          "200": {
-            "description": "Comando de abertura enviado com sucesso",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": {
-                          "type": "string",
-                          "example": "Comando de abertura enviado com sucesso."
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
+        "description": "Envia comando para abrir o portão e permite informar um tempo de fechamento automático (autoCloseTime, em segundos). Se não for informado, o portão permanece aberto até comando de fechamento.",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "examples": {
+                "minimo": {
+                  "summary": "Mínimo",
+                  "value": {}
+                },
+                "completo": {
+                  "summary": "Completo",
+                  "value": {
+                    "autoCloseTime": 10
                   }
                 }
-              }
-            }
-          },
-          "500": {
-            "description": "Falha ao enviar comando",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Falha ao enviar comando para abrir o portão."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
+              },
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "autoCloseTime": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "description": "Tempo em segundos para fechamento automático do portão"
                   }
                 }
               }
             }
           }
-        }
-      }
-    },
-    "/v2/api/gate/open/{autoCloseTime}": {
-      "post": {
-        "tags": [
-          "Portões"
-        ],
-        "summary": "Abre o portão com fechamento automático",
-        "description": "Envia comando para abrir o portão com tempo definido em segundos para fechamento automático.",
-        "parameters": [
-          {
-            "name": "autoCloseTime",
-            "in": "path",
-            "required": true,
-            "description": "Tempo em segundos para fechamento automático do portão",
-            "schema": {
-              "type": "integer",
-              "minimum": 1,
-              "example": 10
-            }
-          }
-        ],
+        },
         "responses": {
           "200": {
             "description": "Comando de abertura enviado com sucesso",

@@ -269,13 +269,13 @@ export class AntennaManager {
         return 'unknown';
     }
   }
-  public async openGate(autoCloseTime?: number): Promise<boolean> {
+  public async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean }): Promise<boolean> {
     if (!gateController) {
       return false;
     }
 
     try {
-      return await gateController.openGate(autoCloseTime);
+      return await gateController.openGate(autoCloseTime, options);
     } catch (error) {
       logger.error('[AntennaManager] Erro ao abrir portão via rota', { error, antennaId: this.antenna.id });
       return false;

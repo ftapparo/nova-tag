@@ -17,11 +17,8 @@ export default (antennaInstance: AntennaManager) => {
     // Rota para obter o estado atual do portão
     router.get('/gate/state', gateControl.getGateState);
 
-    // Rota para abrir o portão
+    // Rota para abrir o portão (autoCloseTime opcional via body)
     router.post('/gate/open', gateControl.openGate);
-
-    // Rota para abrir o portão com tempo para fechamento automático
-    router.post('/gate/open/:autoCloseTime', gateControl.openGate);
 
     // Rota para fechar o portão
     router.post('/gate/close', gateControl.closeGate);

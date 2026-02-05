@@ -33,6 +33,7 @@ export class GateController {
     private readonly socket: net.Socket;
     private readonly openDurationMs: number;
     private readonly antennaId: number;
+    private keepOpen: boolean = false;
 
     /**
      * Cria uma instância do GateController
@@ -58,19 +59,29 @@ export class GateController {
      * Envia comando para abrir o portão, inicia timer de fechamento automático e atualiza estado
      * @returns Promise<boolean> true se comando enviado com sucesso
      */
-    async openGate(autoCloseTime?: number): Promise<boolean> {
+    async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean }): Promise<boolean> {
+        if (options?.keepOpen === true) {
+            this.keepOpen = true;
+        } else if (options?.keepOpen === false) {
+            this.keepOpen = false;
+        }
+
         if (this.state === GateState.OPEN) {
             if (this.openTimer) {
                 clearTimeout(this.openTimer);
                 this.openTimer = null;
             }
 
-            this.openTimer = setTimeout(() => {
-                // Comentário: fechamento automático após tempo configurado
-                this.closeGate();
-            }, autoCloseTime ?? this.openDurationMs);
+            if (!this.keepOpen) {
+                this.openTimer = setTimeout(() => {
+                    // Comentário: fechamento automático após tempo configurado
+                    this.closeGate();
+                }, autoCloseTime ?? this.openDurationMs);
 
-            logger.debug('[GateController] Temporizador rearmado', { antennaId: this.antennaId });
+                logger.debug('[GateController] Temporizador rearmado', { antennaId: this.antennaId });
+            } else {
+                logger.info('[GateController] Portão mantido aberto sem fechamento automático', { antennaId: this.antennaId });
+            }
             return true;
         }
 
@@ -84,12 +95,15 @@ export class GateController {
             logger.metric('OPEN_GATE', 1);
             logger.info('[GateController] Portão abrindo', { antennaId: this.antennaId });
 
-
-            // Timer para fechamento automático
-            this.openTimer = setTimeout(() => {
-                // Comentário: fechamento automático após tempo configurado
-                this.closeGate();
-            }, autoCloseTime ?? this.openDurationMs);
+            if (!this.keepOpen) {
+                // Timer para fechamento automático
+                this.openTimer = setTimeout(() => {
+                    // Comentário: fechamento automático após tempo configurado
+                    this.closeGate();
+                }, autoCloseTime ?? this.openDurationMs);
+            } else {
+                logger.info('[GateController] Portão mantido aberto sem fechamento automático', { antennaId: this.antennaId });
+            }
 
             this.state = GateState.OPEN;
             return true;
@@ -109,6 +123,7 @@ export class GateController {
             return false;
         }
         try {
+            this.keepOpen = false;
             this.sendCommand(this.relayCloseCmd);
             this.state = GateState.CLOSING;
             logger.metric('CLOSE_GATE', 1);
