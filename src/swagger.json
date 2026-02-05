@@ -1,7 +1,7 @@
 {
   "openapi": "3.0.1",
   "info": {
-    "title": "API Controle do Portão - Condomínio Nova Residence",
+    "title": "NOVA-TAG",
     "description": "API para controle de portão automatizado com leitura RFID das antenas TAG1 e TAG2",
     "version": "2.0.0"
   },
@@ -21,7 +21,7 @@
       "description": "Verificacao de status e saude da API (health check)."
     },
     {
-      "name": "Gate",
+      "name": "Portões",
       "description": "Funcionalidades para controle de portão: abertura, fechamento e status."
     }
   ],
@@ -121,7 +121,7 @@
     "/v2/api/gate/state": {
       "get": {
         "tags": [
-          "Gate"
+          "Portões"
         ],
         "summary": "Obtém o estado atual do portão",
         "description": "Retorna o estado atual do portão (OPEN, CLOSED, UNKNOWN).",
@@ -168,7 +168,7 @@
     "/v2/api/gate/open": {
       "post": {
         "tags": [
-          "Gate"
+          "Portões"
         ],
         "summary": "Abre o portão",
         "description": "Envia comando para abrir o portão sem tempo de fechamento automático.",
@@ -236,7 +236,7 @@
     "/v2/api/gate/open/{autoCloseTime}": {
       "post": {
         "tags": [
-          "Gate"
+          "Portões"
         ],
         "summary": "Abre o portão com fechamento automático",
         "description": "Envia comando para abrir o portão com tempo definido em segundos para fechamento automático.",
@@ -343,7 +343,7 @@
     "/v2/api/gate/close": {
       "post": {
         "tags": [
-          "Gate"
+          "Portões"
         ],
         "summary": "Fecha o portão",
         "description": "Envia comando para fechar o portão imediatamente.",
@@ -411,7 +411,7 @@
     "/v2/api/gate/restart": {
       "post": {
         "tags": [
-          "Gate"
+          "Portões"
         ],
         "summary": "Reinicia a conexão com a antena",
         "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas.",
