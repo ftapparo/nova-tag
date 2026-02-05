@@ -27,7 +27,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
     /**
      * Middleware para tratar requisições OPTIONS (CORS Preflight).
      */
-    app.options('*', cors());
+    app.options('/*', cors());
 
     /**
      * Middleware para parsear JSON nas requisições.
@@ -64,7 +64,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
      * Middleware para tratar rotas não encontradas (404).
      */
     app.use((_req, res) => {
-        res.fail('Rota não encontrada.', 404);
+        res.status(404).send();
     });
 
     /**

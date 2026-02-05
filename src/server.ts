@@ -4,7 +4,12 @@ import { StartWebServer } from './api/web-server.api';
 import { AntennaManager, AntennaConfig } from './core/antenna-manager';
 
 // Carrega variáveis de ambiente do arquivo .env
-dotenv.config();
+const dotenvResult = dotenv.config();
+if (dotenvResult.error) {
+    console.error('[Server] Falha ao carregar .env:', dotenvResult.error);
+} else {
+    console.log('[Server] .env carregado com sucesso');
+}
 
 /**
  * Inicializa o serviço web (Express) e as conexões de socket com as antenas RFID (TAG1 e TAG2).
