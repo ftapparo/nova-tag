@@ -132,9 +132,9 @@ export class AntennaManager {
         return;
       }
 
-      // Resposta de comando de fechamento
-      else if (hexData.startsWith("cf000073")) {
-        if (hexData.startsWith("cf000073020001")) {
+      // Resposta de comando de configuração de filtro
+      else if (hexData.startsWith("cf000076")) {
+        if (hexData.startsWith("cf000076020001")) {
           logger.debug("[MASK] Filtro por máscara configurado com sucesso");
 
         }
