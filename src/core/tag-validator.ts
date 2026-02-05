@@ -197,7 +197,7 @@ export class TagValidator {
      */
     private async validateViaAPI(tag: string, context: AccessContext): Promise<ValidationResult> {
         try {
-            const requestUrl = `${this.apiBaseUrl}/v2/api/access/verify`;
+            const requestUrl = `${this.apiBaseUrl}/access/verify`;
             const params = {
                 id: tag,
                 dispositivo: context.device,
