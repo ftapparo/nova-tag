@@ -231,9 +231,14 @@ export class TagValidator {
                 data: response.data
             });
 
-            const payload = response.data as { status?: string; data?: AccessVerifyData; message?: string };
+            const payload = response.data as {
+                status?: string;
+                data?: AccessVerifyData | AccessVerifyData[];
+                message?: string | null;
+                errors?: unknown;
+            };
 
-            if (payload?.status !== 'success') {
+            if (payload?.status && payload.status !== 'success') {
                 return {
                     isValid: false,
                     tag,
@@ -242,9 +247,21 @@ export class TagValidator {
                 };
             }
 
-            const verifyData = payload.data || {};
-            const permitted = (verifyData.PERMITIDO || '').trim() === 'S';
-            const accessId = (verifyData.IDENT || '').toString().trim() || undefined;
+            if (payload?.errors) {
+                return {
+                    isValid: false,
+                    tag,
+                    reason: this.extractApiErrorReason(payload),
+                    timestamp: new Date()
+                };
+            }
+
+            const rawData = Array.isArray(payload.data) ? payload.data[0] : payload.data;
+            const verifyData = rawData || {};
+            const permittedFlag = (verifyData.PERMITIDO || '').toString().trim();
+            const hasData = Boolean(rawData && Object.keys(rawData).length > 0);
+            const permitted = permittedFlag ? permittedFlag === 'S' : hasData;
+            const accessId = (verifyData.IDENT || (verifyData as { IDENT?: string }).IDENT || '').toString().trim() || undefined;
 
             return {
                 isValid: permitted,
