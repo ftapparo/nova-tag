@@ -34,6 +34,7 @@ RUN npm install --only=production && \
 
 # Copia build da stage anterior
 COPY --from=builder /app/dist ./dist
+COPY .env ./.env
 
 # Copia arquivo de configuração do PM2
 COPY ecosystem.config.js ./

@@ -1,3 +1,4 @@
+import axios, { AxiosError } from 'axios';
 import logger from '../utils/logger';
 
 /**
@@ -6,6 +7,8 @@ import logger from '../utils/logger';
 export interface ValidationResult {
     isValid: boolean;
     tag: string;
+    accessId?: string;
+    verifyData?: AccessVerifyData;
     reason?: string;
     timestamp: Date;
 }
@@ -17,6 +20,39 @@ export interface TagCache {
     tag: string;
     validatedAt: Date;
     isValid: boolean;
+    accessId?: string;
+    verifyData?: AccessVerifyData;
+}
+
+/**
+ * Estrutura de dados retornada pela API de verificação
+ */
+export interface AccessVerifyData {
+    PERMITIDO?: string;
+    SEQPESSOA?: string | number;
+    SEQCLASSIFICACAO?: string | number;
+    CLASSIFAUTORIZADA?: string;
+    AUTORIZACAOLANC?: string;
+    TIPO?: string;
+    SEQIDACESSO?: string | number;
+    QUADRA?: string;
+    LOTE?: string;
+    PANICO?: string;
+    MIDIA?: string;
+    IDENT?: string;
+    SEQVEICULO?: string | number;
+    NOME?: string;
+    DESCRICAO?: string;
+}
+
+/**
+ * Contexto necessário para validação e registro de acesso
+ */
+export interface AccessContext {
+    device: number;
+    direction: string;
+    antennaName: string;
+    photo?: string;
 }
 
 /**
@@ -49,7 +85,7 @@ export class TagValidator {
      * @param tag TAG RFID a ser validada
      * @returns Resultado da validação
      */
-    async validateTag(tag: string): Promise<ValidationResult> {
+    async validateTag(tag: string, context: AccessContext): Promise<ValidationResult> {
         try {
             // Sanitizar TAG
             const sanitizedTag = this.sanitizeTag(tag);
@@ -75,16 +111,18 @@ export class TagValidator {
                 return {
                     isValid: cachedResult.isValid,
                     tag: sanitizedTag,
+                    accessId: cachedResult.accessId,
+                    verifyData: cachedResult.verifyData,
                     reason: cachedResult.isValid ? 'Cache hit - válida' : 'Cache hit - inválida',
                     timestamp: new Date()
                 };
             }
 
             // Validar via API
-            const apiResult = await this.validateViaAPI(sanitizedTag);
+            const apiResult = await this.validateViaAPI(sanitizedTag, context);
 
             // Atualizar cache
-            this.updateCache(sanitizedTag, apiResult.isValid);
+            this.updateCache(sanitizedTag, apiResult.isValid, apiResult.accessId, apiResult.verifyData);
 
             logger.info('[TagValidator] Validação de TAG via API', {
                 tag: sanitizedTag,
@@ -153,41 +191,66 @@ export class TagValidator {
      * @param tag TAG já sanitizada
      * @returns Resultado da validação
      */
-    private async validateViaAPI(tag: string): Promise<ValidationResult> {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), this.apiTimeout);
-
+    private async validateViaAPI(tag: string, context: AccessContext): Promise<ValidationResult> {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/access/verify`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'nova-tag/1.0.0'
-                },
-                body: JSON.stringify({ tag }),
-                signal: controller.signal
-            });
+            const response = await axios.get(
+                `${this.apiBaseUrl}/v2/api/access/verify`,
+                {
+                    params: {
+                        id: tag,
+                        dispositivo: context.device,
+                        foto: context.photo ?? null,
+                        sentido: context.direction
+                    },
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'nova-tag/2.0.0'
+                    },
+                    timeout: this.apiTimeout
+                }
+            );
 
-            clearTimeout(timeoutId);
+            const payload = response.data as { status?: string; data?: AccessVerifyData; message?: string };
 
-            if (!response.ok) {
-                throw new Error(`API error: ${response.status} ${response.statusText}`);
+            if (payload?.status !== 'success') {
+                return {
+                    isValid: false,
+                    tag,
+                    reason: payload?.message || 'Falha ao consultar TAG na API',
+                    timestamp: new Date()
+                };
             }
 
-            const data = await response.json();
+            const verifyData = payload.data || {};
+            const permitted = (verifyData.PERMITIDO || '').trim() === 'S';
+            const accessId = (verifyData.IDENT || '').toString().trim() || undefined;
 
             return {
-                isValid: data.authorized === true,
+                isValid: permitted,
                 tag,
-                reason: data.authorized ? 'TAG autorizada pela API' : data.reason || 'TAG não autorizada',
+                accessId,
+                verifyData,
+                reason: permitted ? 'TAG autorizada pela API' : 'TAG não autorizada',
                 timestamp: new Date()
             };
 
         } catch (error) {
-            clearTimeout(timeoutId);
+            if (axios.isAxiosError(error)) {
+                const axiosError = error as AxiosError;
 
-            if (error instanceof Error && error.name === 'AbortError') {
-                throw new Error('Timeout na consulta à API');
+                if (axiosError.code === 'ECONNABORTED') {
+                    throw new Error('Timeout na consulta à API');
+                }
+
+                if (axiosError.response) {
+                    throw new Error(
+                        `API error: ${axiosError.response.status} ${axiosError.response.statusText}`
+                    );
+                }
+
+                if (axiosError.request) {
+                    throw new Error('Falha na conexão com a API');
+                }
             }
 
             throw error;
@@ -199,11 +262,13 @@ export class TagValidator {
      * @param tag TAG já sanitizada
      * @param isValid Resultado da validação
      */
-    private updateCache(tag: string, isValid: boolean): void {
+    private updateCache(tag: string, isValid: boolean, accessId?: string, verifyData?: AccessVerifyData): void {
         this.tagCache.set(tag, {
             tag,
             validatedAt: new Date(),
-            isValid
+            isValid,
+            accessId,
+            verifyData
         });
 
         // Limitar tamanho do cache (máximo 100 TAGs)
@@ -221,38 +286,92 @@ export class TagValidator {
      * @param antennaId Identificador da antena
      * @returns true se registro bem-sucedido
      */
-    async registerAccess(tag: string, antennaId: string): Promise<boolean> {
+    async registerAccess(tag: string, verifyData: AccessVerifyData | undefined, context: AccessContext): Promise<boolean> {
         try {
-            const response = await fetch(`${this.apiBaseUrl}/access/register`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'User-Agent': 'nova-tag/1.0.0'
-                },
-                body: JSON.stringify({
+            if (!verifyData) {
+                logger.warn('[TagValidator] Registro ignorado: dados ausentes', {
                     tag,
-                    antennaId,
-                    timestamp: new Date().toISOString(),
-                    direction: process.env[`${antennaId}_DIRECTION`] || 'UNKNOWN'
-                })
-            });
-
-            if (!response.ok) {
-                logger.error('[TagValidator] Falha ao registrar acesso', {
-                    tag,
-                    antennaId,
-                    status: response.status
+                    antennaName: context.antennaName
                 });
                 return false;
             }
 
-            logger.info('[TagValidator] Acesso registrado com sucesso', { tag, antennaId });
+            await axios.post(
+                `${this.apiBaseUrl}/access/register`,
+                {
+                    dispositivo: context.device,
+                    pessoa: verifyData.SEQPESSOA,
+                    classificacao: verifyData.SEQCLASSIFICACAO,
+                    classAutorizado: (verifyData.CLASSIFAUTORIZADA || '').toString().trim(),
+                    autorizacaoLanc: (verifyData.AUTORIZACAOLANC || '').toString().trim(),
+                    origem: (verifyData.TIPO || '').toString().trim(),
+                    seqIdAcesso: verifyData.SEQIDACESSO,
+                    sentido: (context.direction || '').toString().trim(),
+                    quadra: (verifyData.QUADRA || '').toString().trim(),
+                    lote: (verifyData.LOTE || '').toString().trim(),
+                    panico: (verifyData.PANICO || '').toString().trim(),
+                    formaAcesso: (verifyData.MIDIA || '').toString().trim(),
+                    idAcesso: (verifyData.IDENT || '').toString().trim(),
+                    seqVeiculo: verifyData.SEQVEICULO
+                },
+                {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'User-Agent': 'nova-tag/2.0.0'
+                    },
+                    timeout: this.apiTimeout
+                }
+            );
+
+            if (process.env.DEBUG === 'true') {
+                const timestamp = new Date().toTimeString().split(' ')[0];
+                const sentido = context.direction === 'S' ? 'Saída' : 'Entrada';
+                logger.info(
+                    `[REGISTER] ID:${(verifyData.IDENT || '').toString().trim()} ${(verifyData.MIDIA || '').toString().trim()}, ${(verifyData.NOME || '').toString().trim()}, ${(verifyData.DESCRICAO || '').toString().trim()}, ${sentido} (${timestamp})`
+                );
+            }
+
+            logger.info('[TagValidator] Acesso registrado com sucesso', { tag, antennaName: context.antennaName });
             return true;
 
         } catch (error) {
-            logger.error('[TagValidator] Erro ao registrar acesso', { tag, antennaId, error });
+            if (axios.isAxiosError(error) && error.response) {
+                logger.error('[TagValidator] Falha ao registrar acesso', {
+                    tag,
+                    antennaName: context.antennaName,
+                    status: error.response.status
+                });
+                return false;
+            }
+
+            logger.error('[TagValidator] Erro ao registrar acesso', { tag, antennaName: context.antennaName, error });
             return false;
         }
+    }
+
+    /**
+     * Extrai motivo de erro da resposta da API
+     * @param payload Resposta da API de verificação
+     * @returns Motivo de erro
+     */
+    private extractApiErrorReason(payload: { message?: string | null; errors?: unknown }): string {
+        if (payload?.message) {
+            return payload.message;
+        }
+
+        if (payload?.errors) {
+            if (typeof payload.errors === 'string') {
+                return payload.errors;
+            }
+
+            try {
+                return JSON.stringify(payload.errors);
+            } catch {
+                return 'TAG não autorizada';
+            }
+        }
+
+        return 'TAG não autorizada';
     }
 
     /**

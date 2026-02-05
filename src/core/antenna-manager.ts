@@ -287,11 +287,17 @@ export class AntennaManager {
    * @param antennaName Nome da antena que leu a TAG
    */
   private async handleTagRead(tagNumber: string, antennaName: string) {
-    const result = await tagValidator.validateTag(tagNumber);
+    const accessContext = {
+      device: this.antenna.device,
+      direction: this.antenna.direction,
+      antennaName,
+    };
+
+    const result = await tagValidator.validateTag(tagNumber, accessContext);
     if (result.isValid) {
       logger.info(`[AUTHORIZED] TAG ${tagNumber} autorizada`);
       logger.counter('AUTHORIZED');
-      await tagValidator.registerAccess(tagNumber, antennaName);
+      await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
       gateController.openGate();
     } else {
       logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
