@@ -31,4 +31,5 @@ services:
 
 networks:
   nova-network:
-    driver: bridge
+    external: true
+    name: nova-network
