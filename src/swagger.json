@@ -5,6 +5,11 @@
     "description": "API para controle de portão automatizado com leitura RFID das antenas TAG1 e TAG2",
     "version": "2.0.0"
   },
+  "servers": [
+    {
+      "url": "/"
+    }
+  ],
   "tags": [
     {
       "name": "Monitoramento",
