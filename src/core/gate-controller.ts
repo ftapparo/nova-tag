@@ -59,6 +59,21 @@ export class GateController {
      * @returns Promise<boolean> true se comando enviado com sucesso
      */
     async openGate(autoCloseTime?: number): Promise<boolean> {
+        if (this.state === GateState.OPEN) {
+            if (this.openTimer) {
+                clearTimeout(this.openTimer);
+                this.openTimer = null;
+            }
+
+            this.openTimer = setTimeout(() => {
+                // Comentário: fechamento automático após tempo configurado
+                this.closeGate();
+            }, autoCloseTime ?? this.openDurationMs);
+
+            logger.debug('[GateController] Temporizador rearmado', { antennaId: this.antennaId });
+            return true;
+        }
+
         if (this.state !== GateState.CLOSED) {
             logger.warn('[GateController] Tentativa de abrir portão já em estado', { state: this.state, antennaId: this.antennaId });
             return false;

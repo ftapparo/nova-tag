@@ -2,7 +2,7 @@ import net from 'net';
 import dotenv from 'dotenv';
 import logger from '../utils/logger';
 import { GateController } from './gate-controller';
-import { TagValidator } from './tag-validator';
+import { TagValidator, AccessVerifyData } from './tag-validator';
 
 // Tipagem da configuração da antena
 export interface AntennaConfig {
@@ -32,6 +32,7 @@ dotenv.config();
 const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_TIMEOUT) || 10000;
 const ATTEMPT_RECONNECT = Number(process.env.ATTEMPT_RECONNECT) || 3;
 const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
+const RECENT_AUTHORIZED_LIMIT = Number(process.env.RECENT_AUTHORIZED_LIMIT) || 3;
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
@@ -57,6 +58,7 @@ export class AntennaManager {
   // Configuração da antena gerenciada por esta instância
   public antenna: AntennaConfig;
   public antennaSocket: net.Socket;
+  private recentAuthorizedTags: Map<string, AccessVerifyData | undefined> = new Map();
 
   /**
    * Inicia a conexão com a antena RFID e gerencia eventos de comunicação TCP
@@ -97,6 +99,8 @@ export class AntennaManager {
         clearTimeout(closeGateTimeout);
         closeGateTimeout = null;
       }
+
+      this.recentAuthorizedTags.clear();
 
       this.antennaSocket.setTimeout(HEALTHCHECK_TIMEOUT);
       logger.info(`[CONNECTED] Antena RFID [IP: ${this.antenna.ip}]`);
@@ -287,6 +291,13 @@ export class AntennaManager {
    * @param antennaName Nome da antena que leu a TAG
    */
   private async handleTagRead(tagNumber: string, antennaName: string) {
+    const cachedVerifyData = this.recentAuthorizedTags.get(tagNumber);
+    if (cachedVerifyData !== undefined) {
+      this.logTagRead(tagNumber, true, cachedVerifyData);
+      gateController.openGate();
+      return;
+    }
+
     const accessContext = {
       device: this.antenna.device,
       direction: this.antenna.direction,
@@ -295,12 +306,38 @@ export class AntennaManager {
 
     const result = await tagValidator.validateTag(tagNumber, accessContext);
     if (result.isValid) {
-      logger.info(`[AUTHORIZED] TAG ${tagNumber} autorizada`);
+      this.logTagRead(tagNumber, true, result.verifyData);
       logger.counter('AUTHORIZED');
+      this.recentAuthorizedTags.set(tagNumber, result.verifyData);
+      if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
+        const oldest = this.recentAuthorizedTags.keys().next().value;
+        if (typeof oldest === 'string') {
+          this.recentAuthorizedTags.delete(oldest);
+        }
+      }
       await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
       gateController.openGate();
     } else {
+      this.logTagRead(tagNumber, false, result.verifyData, result.reason);
       logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
     }
+  }
+
+  /**
+   * Registra log da leitura de TAG com dados do portador e status de autorização.
+   * @param tagNumber Número da TAG
+   * @param isAuthorized Status de autorização
+   * @param verifyData Dados retornados pela validação
+   * @param reason Motivo quando não autorizado
+   */
+  private logTagRead(tagNumber: string, isAuthorized: boolean, verifyData?: AccessVerifyData, reason?: string): void {
+    const nome = (verifyData?.NOME || '').toString().trim();
+    const media = (verifyData?.MIDIA || '').toString().trim();
+    const descricao = (verifyData?.DESCRICAO || '').toString().trim();
+    const status = isAuthorized ? 'AUTORIZADA' : 'NÃO AUTORIZADA';
+    const detalhes = [media, nome, descricao].filter(Boolean).join(', ');
+    const motivo = reason ? ` Motivo: ${reason}` : '';
+
+    logger.info(`[TAG] ${tagNumber} ${status}${detalhes ? ` - ${detalhes}` : ''}${motivo}`);
   }
 }

@@ -369,14 +369,9 @@ export class TagValidator {
                 }
             );
 
-            if (process.env.DEBUG === 'true') {
-                const timestamp = new Date().toTimeString().split(' ')[0];
-                const sentido = context.direction === 'S' ? 'Saída' : 'Entrada';
-                logger.info(
-                    `[REGISTER] ID:${(verifyData.IDENT || '').toString().trim()} ${(verifyData.MIDIA || '').toString().trim()}, ${(verifyData.NOME || '').toString().trim()}, ${(verifyData.DESCRICAO || '').toString().trim()}, ${sentido} (${timestamp})`
-                );
-            }
-
+            const accessId = (verifyData.IDENT || '').toString().trim();
+            const sentido = context.direction === 'S' ? 'Saída' : 'Entrada';
+            logger.info(`[REGISTER] ID:${accessId} TAG:${tag} ${sentido}`);
             logger.info('[TagValidator] Acesso registrado com sucesso', { tag, antennaName: context.antennaName });
             return true;
 
