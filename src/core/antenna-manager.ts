@@ -261,8 +261,39 @@ export class AntennaManager {
         clearTimeout(closeGateTimeout);
         closeGateTimeout = null;
       }
+    }
+  }
 
-      process.exit(1);
+  /**
+   * Reinicia a conexão TCP com a antena RFID.
+   * @returns `true` se o fluxo de reinício foi disparado.
+   */
+  public async restartConnection(): Promise<boolean> {
+    try {
+      if (this.antennaSocket && !this.antennaSocket.destroyed) {
+        logger.warn(`[RESTART] Reiniciando conexão da antena [${this.antenna.ip}]`);
+        this.antennaSocket.destroy();
+      } else {
+        logger.warn(`[RESTART] Socket já estava encerrado para antena [${this.antenna.ip}]`);
+      }
+
+      if (closeGateTimeout) {
+        clearTimeout(closeGateTimeout);
+        closeGateTimeout = null;
+      }
+
+      healthCheckWaitResponse = false;
+      isReconnecting = false;
+      connectionRetry = 0;
+
+      setTimeout(() => {
+        this.connectToAntenna();
+      }, 300);
+
+      return true;
+    } catch (error) {
+      logger.error('[AntennaManager] Erro ao reiniciar conexão da antena', { error, antennaId: this.antenna.id });
+      return false;
     }
   }
 

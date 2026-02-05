@@ -22,7 +22,7 @@
           "Monitoramento"
         ],
         "summary": "Verificacao de status da API",
-        "description": "Retorna o status de funcionamento da API e o ambiente atual.",
+        "description": "Retorna o status de funcionamento da API e o ambiente atual. Quando a antena estiver sem resposta no healthcheck, retorna 503.",
         "responses": {
           "200": {
             "description": "API em funcionamento",
@@ -41,6 +41,14 @@
                         "environment": {
                           "type": "string",
                           "example": "development"
+                        },
+                        "antennaStatus": {
+                          "type": "string",
+                          "example": "OK"
+                        },
+                        "antennaHealthcheckPending": {
+                          "type": "boolean",
+                          "example": false
                         }
                       }
                     },
@@ -58,6 +66,48 @@
                 }
               }
             }
+          },
+          "503": {
+            "description": "Antena sem resposta no healthcheck",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "API Funcionando!"
+                        },
+                        "environment": {
+                          "type": "string",
+                          "example": "development"
+                        },
+                        "antennaStatus": {
+                          "type": "string",
+                          "example": "HEALTHCHECK_PENDING"
+                        },
+                        "antennaHealthcheckPending": {
+                          "type": "boolean",
+                          "example": true
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Antena sem resposta no healthcheck."
+                    },
+                    "errors": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -68,7 +118,7 @@
           "Monitoramento"
         ],
         "summary": "Verificacao de status da API",
-        "description": "Retorna o status de funcionamento da API e o ambiente atual.",
+        "description": "Retorna o status de funcionamento da API e o ambiente atual. Quando a antena estiver sem resposta no healthcheck, retorna 503.",
         "responses": {
           "200": {
             "description": "API em funcionamento",
@@ -87,6 +137,14 @@
                         "environment": {
                           "type": "string",
                           "example": "development"
+                        },
+                        "antennaStatus": {
+                          "type": "string",
+                          "example": "OK"
+                        },
+                        "antennaHealthcheckPending": {
+                          "type": "boolean",
+                          "example": false
                         }
                       }
                     },
@@ -97,6 +155,48 @@
                     },
                     "errors": {
                       "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Antena sem resposta no healthcheck",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "status": {
+                          "type": "string",
+                          "example": "API Funcionando!"
+                        },
+                        "environment": {
+                          "type": "string",
+                          "example": "development"
+                        },
+                        "antennaStatus": {
+                          "type": "string",
+                          "example": "HEALTHCHECK_PENDING"
+                        },
+                        "antennaHealthcheckPending": {
+                          "type": "boolean",
+                          "example": true
+                        }
+                      }
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Antena sem resposta no healthcheck."
+                    },
+                    "errors": {
+                      "type": "object",
                       "nullable": true,
                       "example": null
                     }
@@ -352,7 +452,46 @@
           "Portões"
         ],
         "summary": "Reinicia a conexão com a antena",
-        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas.",
+        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas. Use forceRestart para encerrar o container e forçar reinício pelo Docker.",
+        "parameters": [
+          {
+            "name": "forceRestart",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            },
+            "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
+          }
+        ],
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "examples": {
+                "minimo": {
+                  "summary": "Mínimo",
+                  "value": {}
+                },
+                "completo": {
+                  "summary": "Completo",
+                  "value": {
+                    "forceRestart": true
+                  }
+                }
+              },
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "forceRestart": {
+                    "type": "boolean",
+                    "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
+                  }
+                }
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "description": "Conexão reiniciada com sucesso",
@@ -374,6 +513,32 @@
                       "type": "string",
                       "nullable": true,
                       "example": null
+                    },
+                    "errors": {
+                      "type": "string",
+                      "nullable": true,
+                      "example": null
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Falha ao reiniciar conexão com a antena",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "nullable": true,
+                      "example": null
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Falha ao reiniciar conexão com a antena."
                     },
                     "errors": {
                       "type": "string",

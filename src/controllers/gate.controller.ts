@@ -96,6 +96,18 @@ export const restartAntennaConnection = async (req: Request, res: Response, ante
             return;
         }
 
+        const rawForceRestart = req.body?.forceRestart ?? req.query?.forceRestart;
+        const forceRestart = parseBoolean(rawForceRestart);
+
+        if (forceRestart) {
+            res.ok({ message: 'Reinício forçado solicitado. Encerrando aplicação.' });
+            setTimeout(() => {
+                console.log('[GateController] Encerrando aplicação para reinício forçado.');
+                process.exit(1);
+            }, 100);
+            return;
+        }
+
         const result = await antennaInstance.restartConnection();
 
         if (result === true) {
@@ -107,4 +119,26 @@ export const restartAntennaConnection = async (req: Request, res: Response, ante
         console.error('[GateController] Erro ao reiniciar conexão com a antena:', error);
         res.fail('Erro inesperado ao reiniciar a conexão com a antena.', 500, error instanceof Error ? error.message : error);
     }
+};
+
+/**
+ * Converte um valor arbitrário para booleano.
+ * @param value Valor recebido via query ou body.
+ * @returns `true` quando o valor indica ativação explícita.
+ */
+const parseBoolean = (value: unknown): boolean => {
+    if (typeof value === 'boolean') {
+        return value;
+    }
+
+    if (typeof value === 'number') {
+        return value === 1;
+    }
+
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
+    }
+
+    return false;
 };
