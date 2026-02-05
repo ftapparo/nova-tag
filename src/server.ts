@@ -1,5 +1,5 @@
-import axios from 'axios';
 import dotenv from 'dotenv';
+import axios from 'axios';
 import { StartWebServer } from './api/web-server.api';
 import { AntennaManager, AntennaConfig } from './core/antenna-manager';
 
@@ -72,7 +72,7 @@ async function StartService(): Promise<void> {
  * Executa healthcheck na API externa antes de iniciar o serviço
  */
 async function checkExternalApiHealth(): Promise<void> {
-    const apiBaseUrl = process.env.API_BASE_URL || 'http://localhost:3000';
+    const apiBaseUrl = process.env.API_BASE_URL || 'https://api.condominionovaresidence.com/v2/api';
     const timeout = Number(process.env.API_HEALTHCHECK_TIMEOUT) || 5000;
     const endpoints = ['/healthcheck', '/health'];
 

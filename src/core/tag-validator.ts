@@ -1,5 +1,9 @@
+import dotenv from 'dotenv';
 import axios, { AxiosError } from 'axios';
 import logger from '../utils/logger';
+
+// Carrega variáveis de ambiente do arquivo .env
+dotenv.config();
 
 /**
  * Resultado da validação de uma TAG RFID
@@ -72,7 +76,7 @@ export class TagValidator {
      */
     constructor(
         cacheTimeout: number = 300000, // 5 minutos
-        apiBaseUrl: string = process.env.API_BASE_URL || 'http://localhost:3001',
+        apiBaseUrl: string = process.env.API_BASE_URL || 'https://api.condominionovaresidence.com/v2/api',
         apiTimeout: number = 5000 // 5 segundos
     ) {
         this.cacheTimeout = cacheTimeout;
@@ -193,15 +197,26 @@ export class TagValidator {
      */
     private async validateViaAPI(tag: string, context: AccessContext): Promise<ValidationResult> {
         try {
+            const requestUrl = `${this.apiBaseUrl}/v2/api/access/verify`;
+            const params = {
+                id: tag,
+                dispositivo: context.device,
+                foto: null,
+                sentido: context.direction
+            };
+
+            const fullRequestUrl = axios.getUri({ url: requestUrl, params });
+
+            console.log('[TagValidator] Iniciando validação via API', {
+                method: 'GET',
+                url: fullRequestUrl,
+                params
+            });
+
             const response = await axios.get(
-                `${this.apiBaseUrl}/v2/api/access/verify`,
+                requestUrl,
                 {
-                    params: {
-                        id: tag,
-                        dispositivo: context.device,
-                        foto: null,
-                        sentido: context.direction
-                    },
+                    params,
                     headers: {
                         'Content-Type': 'application/json',
                         'User-Agent': 'nova-tag/2.0.0'
@@ -209,6 +224,12 @@ export class TagValidator {
                     timeout: this.apiTimeout
                 }
             );
+
+            console.log('[TagValidator] Resposta da API de validação', {
+                status: response.status,
+                statusText: response.statusText,
+                data: response.data
+            });
 
             const payload = response.data as { status?: string; data?: AccessVerifyData; message?: string };
 
@@ -237,6 +258,14 @@ export class TagValidator {
         } catch (error) {
             if (axios.isAxiosError(error)) {
                 const axiosError = error as AxiosError;
+
+                console.error('[TagValidator] Erro na chamada de validação da API', {
+                    status: axiosError.response?.status,
+                    statusText: axiosError.response?.statusText,
+                    data: axiosError.response?.data,
+                    url: axiosError.config?.url,
+                    params: axiosError.config?.params
+                });
 
                 if (axiosError.code === 'ECONNABORTED') {
                     throw new Error('Timeout na consulta à API');
