@@ -21,21 +21,7 @@ applyTo: '**'
 
 ## Comentários
 
-- Comentários de documentação em formato JSDoc acima de funções, métodos e controllers:
-  ```ts
-  /**
-   * Descrição da função
-   * @param param Descrição do parâmetro
-   * @returns Descrição do retorno
-   */
-  ```
-- Comentarios do Swagger. Todos os arquivos de controller possuem anotações Swagger:
-  ```ts
-  function example() {
-    // #swagger.tags = ['Tag nome do arquivo']
-    // #swagger.description = 'Descrição da rota'
-  }
-  ```
+- Comentários de documentação em formato JSDoc.
 - Comentários explicativos em português, claros e objetivos.
 - Blocos de código complexos recebem comentários de contexto.
 - Controllers, services e integrações possuem comentários de alto nível sobre o propósito do módulo.
