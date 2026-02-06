@@ -1,33 +1,33 @@
 services:
-  # nova-tag-tag1:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile
-  #   container_name: nova-tag-tag1
-  #   restart: unless-stopped
-  #   ports:
-  #     - "4009:4000"
-  #   environment:
-  #     - NODE_ENV=production
-  #     - TAG_ID=TAG1
-  #     - PORT=4000
-  #   env_file:
-  #     - .env
-  #   volumes:
-  #     - /mnt/windows/nova-tag/logs:/app/logs
-  #   networks:
-  #     - nova-network
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:4000/v2/api/healthcheck || exit 1"]
-  #     interval: 30s
-  #     timeout: 10s
-  #     retries: 3
-  #     start_period: 40s
-  #   logging:
-  #     driver: "json-file"
-  #     options:
-  #       max-size: "10m"
-  #       max-file: "3"
+  nova-tag-tag1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: nova-tag-tag1
+    restart: unless-stopped
+    ports:
+      - "4009:4000"
+    environment:
+      - NODE_ENV=production
+      - TAG_ID=TAG1
+      - PORT=4000
+    env_file:
+      - .env
+    volumes:
+      - /mnt/windows/nova-tag/logs:/app/logs
+    networks:
+      - nova-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:4000/v2/api/healthcheck || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
   nova-tag-tag2:
     build:
