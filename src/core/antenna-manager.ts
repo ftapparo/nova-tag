@@ -261,13 +261,29 @@ export class AntennaManager {
     if (!isShuttingDown) {
       isShuttingDown = true;
       logger.issue("[SHUTDOWN] Encerrando aplicação...");
-      this.antennaSocket?.destroy();
+
+      healthCheckWaitResponse = false;
+      isReconnecting = true;
+      connectionRetry = 0;
+
+      if (this.antennaSocket && !this.antennaSocket.destroyed) {
+        this.antennaSocket.end();
+        this.antennaSocket.destroy();
+      }
 
       if (closeGateTimeout) {
         clearTimeout(closeGateTimeout);
         closeGateTimeout = null;
       }
     }
+  }
+
+  /**
+   * Indica se a aplicação está em processo de encerramento.
+   * @returns `true` quando o shutdown já foi iniciado.
+   */
+  public isShuttingDown(): boolean {
+    return isShuttingDown;
   }
 
   /**

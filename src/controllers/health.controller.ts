@@ -41,56 +41,25 @@ export const healthCheck = (_req: Request, res: Response) => {
  * @param antennaInstance Instância da AntennaManager correspondente
  * @returns Retorna mensagem de sucesso ou erro
  */
-export const restartAntennaConnection = async (req: Request, res: Response, antennaInstance: AntennaManager): Promise<void> => {
+export const restartAntennaConnection = async (_req: Request, res: Response, antennaInstance: AntennaManager): Promise<void> => {
     try {
-        if (!antennaInstance.restartConnection) {
-            res.fail('Falha de implementação do método restartConnection.', 500);
+        if (antennaInstance.isShuttingDown()) {
+            res.fail('Aplicação já está em encerramento.', 409);
             return;
         }
 
-        const rawForceRestart = req.body?.forceRestart ?? req.query?.forceRestart;
-        const forceRestart = parseBoolean(rawForceRestart);
+        const shutdownDelayMs = Number(process.env.SHUTDOWN_DELAY_MS) || 2000;
 
-        if (forceRestart) {
-            res.ok({ message: 'Reinício forçado solicitado. Encerrando aplicação.' });
-            setTimeout(() => {
-                console.log('[GateController] Encerrando aplicação para reinício forçado.');
-                process.exit(1);
-            }, 100);
-            return;
-        }
+        res.ok({ message: 'Reinício forçado solicitado. Encerrando aplicação.' });
+        console.log(`[GateController] Encerramento agendado em ${shutdownDelayMs}ms.`);
 
-        const result = await antennaInstance.restartConnection();
+        antennaInstance.shutdown();
 
-        if (result === true) {
-            res.ok({ message: 'Conexão com a antena reiniciada com sucesso.' });
-        } else {
-            res.fail('Falha ao reiniciar conexão com a antena.', 500);
-        }
+        setTimeout(() => {
+            process.exit(1);
+        }, shutdownDelayMs);
     } catch (error) {
-        console.error('[GateController] Erro ao reiniciar conexão com a antena:', error);
-        res.fail('Erro inesperado ao reiniciar a conexão com a antena.', 500, error instanceof Error ? error.message : error);
+        console.error('[GateController] Erro ao finalizar aplicação para reinício forçado:', error);
+        res.fail('Erro inesperado ao finalizar aplicação para reinício forçado.', 500, error instanceof Error ? error.message : error);
     }
-};
-
-/**
- * Converte um valor arbitrário para booleano.
- * @param value Valor recebido via query ou body.
- * @returns `true` quando o valor indica ativação explícita.
- */
-const parseBoolean = (value: unknown): boolean => {
-    if (typeof value === 'boolean') {
-        return value;
-    }
-
-    if (typeof value === 'number') {
-        return value === 1;
-    }
-
-    if (typeof value === 'string') {
-        const normalized = value.trim().toLowerCase();
-        return ['true', '1', 'yes', 'y', 'on'].includes(normalized);
-    }
-
-    return false;
 };
