@@ -2,22 +2,26 @@ import winston from "winston";
 import DailyRotateFile from "winston-daily-rotate-file";
 import dotenv from "dotenv";
 import path from "path";
+import fs from "fs";
 
 dotenv.config();
 
-const instanceName = process.env.TAG_ID || process.argv[2] || "DEFAULT";
-const logDir = path.join("logs", instanceName.toUpperCase());
+const instanceName = (process.env.TAG_ID || process.argv[2] || "DEFAULT").toUpperCase();
 
-// Timestamp customizado
+const LOG_TO_FILE = process.env.LOG_TO_FILE === "true";
+const LOG_BASE_DIR = process.env.LOG_DIR || "/app/logs";
+const logDir = path.join(LOG_BASE_DIR, instanceName);
+
+// Timestamp customizado (Brasil)
 const timestampFormat = winston.format((info) => {
-  const date = new Date().toLocaleString("pt-BR", {
-    timeZone: "America/Sao_Paulo",
-  }).replace(",", "");
+  const date = new Date()
+    .toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" })
+    .replace(",", "");
   info.timestamp = `[${date}]`;
   return info;
 });
 
-// Cores para console
+// Cores do console
 winston.addColors({
   info: "cyan",
   warn: "yellow",
@@ -25,7 +29,7 @@ winston.addColors({
   debug: "white",
 });
 
-// Formato para console
+// Formato do console (stdout → docker logs)
 const consoleFormat = winston.format.combine(
   winston.format.colorize({ all: true }),
   timestampFormat(),
@@ -34,7 +38,7 @@ const consoleFormat = winston.format.combine(
   })
 );
 
-// Formato para arquivos
+// Formato do arquivo
 const fileFormat = winston.format.combine(
   timestampFormat(),
   winston.format.printf(({ timestamp, level, message }) => {
@@ -42,54 +46,59 @@ const fileFormat = winston.format.combine(
   })
 );
 
-// Instância base do logger
-const baseLogger = winston.createLogger({
-  level: "debug",
-  format: winston.format.combine(winston.format.json()),
-  transports: [
-    new winston.transports.Console({ format: consoleFormat }),
-    new DailyRotateFile({
-      filename: `${logDir}/%DATE%.log`,
+// Transports
+const transports: winston.transport[] = [
+  new winston.transports.Console({ format: consoleFormat }),
+];
+
+// Transporte de arquivo (OPCIONAL e CONTROLADO)
+if (LOG_TO_FILE) {
+  try {
+    fs.mkdirSync(logDir, { recursive: true });
+
+    const fileTransport = new DailyRotateFile({
+      filename: path.join(logDir, "%DATE%.log"),
       datePattern: "DDMMYYYY",
       maxSize: "10m",
-      maxFiles: "30d",
-      format: fileFormat,
+      maxFiles: "7d",
       level: "debug",
-    }),
-  ],
+      format: fileFormat,
+      zippedArchive: false,
+    });
+
+    // Se o filesystem falhar, NÃO trava a aplicação
+    fileTransport.on("error", (err) => {
+      console.error(
+        `[${instanceName}] LOGGER FILE TRANSPORT ERROR (file logging disabled):`,
+        err
+      );
+    });
+
+    transports.push(fileTransport);
+  } catch (err) {
+    console.error(
+      `[${instanceName}] LOGGER INIT ERROR (file logging skipped):`,
+      err
+    );
+  }
+}
+
+// Logger base
+const baseLogger = winston.createLogger({
+  level: "debug",
+  transports,
 });
 
-// Adiciona métodos customizados ao logger
+// Logger estendido com helpers
 const logger = Object.assign(baseLogger, {
-  /**
-   * Registra uma métrica única (valor direto) no log local, com nome separado por instância
-   * @param name Nome da métrica (sem o nome da instância)
-   * @param value Valor da métrica (string ou número)
-   */
   metric(name: string, value: string | number) {
-    const fullName = `${name}_${instanceName}`;
-    if (process.env.DEBUG === "true") {
-      baseLogger.debug(`[Metric] ${fullName}=${value}`);
-    }
+    baseLogger.debug(`[Metric] ${name}_${instanceName}=${value}`);
   },
 
-  /**
-   * Incrementa um contador por nome e instância no log local
-   * @param name Nome do contador
-   * @param increment Valor a ser incrementado (padrão: 1)
-   */
   counter(name: string) {
-    const fullName = `${name}_${instanceName}`;
-    if (process.env.DEBUG === "true") {
-      baseLogger.debug(`[Counter] ${fullName}+1`);
-    }
+    baseLogger.debug(`[Counter] ${name}_${instanceName}+1`);
   },
 
-  /**
-   * Registra uma issue (erro crítico) no log local
-   * @param error Mensagem ou objeto Error
-   * @param context Objeto adicional com contexto (opcional)
-   */
   issue(error: string | Error, context: Record<string, any> = {}) {
     const err = error instanceof Error ? error : new Error(String(error));
     baseLogger.error(
@@ -100,6 +109,5 @@ const logger = Object.assign(baseLogger, {
     );
   },
 });
-
 
 export default logger;
