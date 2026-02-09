@@ -58,12 +58,12 @@ if (LOG_TO_FILE) {
 
     const fileTransport = new DailyRotateFile({
       filename: path.join(logDir, "%DATE%.log"),
-      datePattern: "DDMMYYYY",
+      datePattern: "YYYY-MM-DD",
       maxSize: "10m",
       maxFiles: "7d",
       level: "debug",
       format: fileFormat,
-      zippedArchive: false,
+      zippedArchive: true,
     });
 
     // Se o filesystem falhar, NÃO trava a aplicação
