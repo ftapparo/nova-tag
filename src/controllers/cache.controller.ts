@@ -10,7 +10,7 @@ import { getTagValidatorInstance } from '../core/antenna-manager';
 export const listCache = (req: Request, res: Response): void => {
     const cacheType = parseCacheType(req.query?.type);
     if (!cacheType) {
-        res.fail('Tipo de cache inválido. Use positive, negative, all, whitelist ou blacklist.', 400);
+        res.fail('Tipo de cache inválido. Use positive (ou whitelist), negative (ou blacklist) ou all.', 400);
         return;
     }
 
@@ -39,7 +39,7 @@ export const listCache = (req: Request, res: Response): void => {
 export const clearCache = (req: Request, res: Response): void => {
     const cacheType = parseCacheType(req.query?.type);
     if (!cacheType) {
-        res.fail('Tipo de cache inválido. Use positive, negative, all, whitelist ou blacklist.', 400);
+        res.fail('Tipo de cache inválido. Use positive (ou whitelist), negative (ou blacklist) ou all.', 400);
         return;
     }
 

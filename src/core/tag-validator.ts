@@ -465,19 +465,31 @@ export class TagValidator {
      * @param type Tipo de cache (positive, negative ou all).
      * @returns Lista de entradas do cache.
      */
-    listCache(type: 'positive' | 'negative' | 'all' = 'all'): TagCache[] {
+    listCache(type: 'positive' | 'negative' | 'all' | 'whitelist' | 'blacklist' = 'all'): TagCache[] {
         const toArray = (cache: Map<string, TagCache>): TagCache[] =>
             Array.from(cache.values()).map(entry => ({ ...entry }));
 
-        if (type === 'positive') {
-            return toArray(this.positiveTagCache);
+        const sortByNewest = (items: TagCache[]): TagCache[] =>
+            items.sort((a, b) => b.validatedAt.getTime() - a.validatedAt.getTime());
+
+        const normalizedType: 'positive' | 'negative' | 'all' = (() => {
+            if (type === 'whitelist') return 'positive';
+            if (type === 'blacklist') return 'negative';
+            return type;
+        })();
+
+        if (normalizedType === 'positive') {
+            return sortByNewest(toArray(this.positiveTagCache));
         }
 
-        if (type === 'negative') {
-            return toArray(this.negativeTagCache);
+        if (normalizedType === 'negative') {
+            return sortByNewest(toArray(this.negativeTagCache));
         }
 
-        return [...toArray(this.positiveTagCache), ...toArray(this.negativeTagCache)];
+        return sortByNewest([
+            ...toArray(this.positiveTagCache),
+            ...toArray(this.negativeTagCache),
+        ]);
     }
 
     /**
