@@ -223,18 +223,7 @@
           "Monitoramento"
         ],
         "summary": "Reinicia a conexão com a antena",
-        "description": "Reinicia a conexão socket com a antena RFID para recuperação de falhas. Use forceRestart para encerrar o container e forçar reinício pelo Docker.",
-        "parameters": [
-          {
-            "name": "forceRestart",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "boolean"
-            },
-            "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
-          }
-        ],
+        "description": "Encerra as conexões e finaliza o processo para forçar reinício do container.",
         "requestBody": {
           "required": false,
           "content": {
@@ -243,22 +232,11 @@
                 "minimo": {
                   "summary": "Mínimo",
                   "value": {}
-                },
-                "completo": {
-                  "summary": "Completo",
-                  "value": {
-                    "forceRestart": true
-                  }
                 }
               },
               "schema": {
                 "type": "object",
-                "properties": {
-                  "forceRestart": {
-                    "type": "boolean",
-                    "description": "Quando true, encerra o processo com exit(1) para forçar o reinício do container."
-                  }
-                }
+                "properties": {}
               }
             }
           }
