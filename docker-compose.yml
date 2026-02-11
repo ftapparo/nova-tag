@@ -14,7 +14,7 @@ services:
     env_file:
       - .env
     volumes:
-      - C:/Servidor/docker/logs/tag1:/app/logs
+      - C:/Servidor/docker/logs:/app/logs
     networks:
       - nova-network
     healthcheck:
@@ -44,7 +44,7 @@ services:
     env_file:
       - .env
     volumes:
-      - C:/Servidor/docker/logs/tag2:/app/logs
+      - C:/Servidor/docker/logs:/app/logs
     networks:
       - nova-network
     healthcheck:
