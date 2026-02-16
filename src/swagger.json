@@ -41,12 +41,28 @@
                   "$ref": "#/components/schemas/ApiResponseHealth"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          }
+        ]
       }
     },
     "/v2/api/healthcheck": {
@@ -65,12 +81,28 @@
                   "$ref": "#/components/schemas/ApiResponseHealth"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "503": {
             "$ref": "#/components/responses/ServiceUnavailable"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          }
+        ]
       }
     },
     "/v2/api/gate/restart": {
@@ -106,12 +138,28 @@
                   "$ref": "#/components/schemas/ApiResponse"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          }
+        ]
       }
     },
     "/v2/api/gate/state": {
@@ -130,9 +178,25 @@
                   "$ref": "#/components/schemas/ApiResponse"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          }
+        ]
       }
     },
     "/v2/api/gate/open": {
@@ -180,6 +244,14 @@
                   "$ref": "#/components/schemas/ApiResponse"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "400": {
@@ -188,7 +260,15 @@
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          }
+        ]
       }
     },
     "/v2/api/gate/close": {
@@ -207,12 +287,28 @@
                   "$ref": "#/components/schemas/ApiResponse"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "500": {
             "$ref": "#/components/responses/InternalServerError"
           }
-        }
+        },
+        "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          }
+        ]
       }
     },
     "/v2/api/cache": {
@@ -223,6 +319,12 @@
         "summary": "Lista o cache de TAGs",
         "description": "Lista o cache de TAGs. Use type=positive|negative|all|whitelist|blacklist.",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          },
           {
             "name": "type",
             "in": "query",
@@ -249,6 +351,14 @@
                   "$ref": "#/components/schemas/ApiResponse"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "400": {
@@ -266,6 +376,12 @@
         "summary": "Limpa o cache de TAGs",
         "description": "Limpa o cache de TAGs. Use type=positive|negative|all|whitelist|blacklist.",
         "parameters": [
+          {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          },
           {
             "name": "type",
             "in": "query",
@@ -292,6 +408,14 @@
                   "$ref": "#/components/schemas/ApiResponse"
                 }
               }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
+              }
             }
           },
           "400": {
@@ -312,6 +436,12 @@
         "description": "Remove uma TAG específica do cache (whitelist/blacklist).",
         "parameters": [
           {
+            "$ref": "#/components/parameters/ActorHeaderParam"
+          },
+          {
+            "$ref": "#/components/parameters/RequestIdHeaderParam"
+          },
+          {
             "name": "tag",
             "in": "path",
             "required": true,
@@ -329,6 +459,14 @@
                 "schema": {
                   "$ref": "#/components/schemas/ApiResponse"
                 }
+              }
+            },
+            "headers": {
+              "x-request-id": {
+                "$ref": "#/components/headers/RequestIdHeader"
+              },
+              "x-actor": {
+                "$ref": "#/components/headers/ActorHeader"
               }
             }
           },
@@ -405,22 +543,7 @@
             "example": "Erro ao processar requisicao."
           },
           "errors": {
-            "nullable": true,
-            "oneOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "object"
-              },
-              {
-                "type": "array",
-                "items": {
-                  "type": "string"
-                }
-              }
-            ],
-            "example": null
+            "$ref": "#/components/schemas/ErrorMeta"
           }
         }
       },
@@ -486,6 +609,34 @@
             "example": null
           }
         }
+      },
+      "ErrorMeta": {
+        "type": "object",
+        "properties": {
+          "traceId": {
+            "type": "string",
+            "nullable": true,
+            "example": "f25f63b8-2b89-4fc0-8a2e-7b2e8c7d6f53"
+          },
+          "details": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object",
+                "additionalProperties": true
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ]
+          }
+        }
       }
     },
     "responses": {
@@ -497,6 +648,14 @@
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
+          }
         }
       },
       "Unauthorized": {
@@ -506,6 +665,14 @@
             "schema": {
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
+          }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
           }
         }
       },
@@ -517,6 +684,14 @@
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
+          }
         }
       },
       "NotFound": {
@@ -526,6 +701,14 @@
             "schema": {
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
+          }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
           }
         }
       },
@@ -537,6 +720,14 @@
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
+          }
         }
       },
       "UnprocessableEntity": {
@@ -546,6 +737,14 @@
             "schema": {
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
+          }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
           }
         }
       },
@@ -557,6 +756,14 @@
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
+          }
         }
       },
       "InternalServerError": {
@@ -566,6 +773,14 @@
             "schema": {
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
+          }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
           }
         }
       },
@@ -577,6 +792,14 @@
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
+          }
         }
       },
       "ServiceUnavailable": {
@@ -586,6 +809,14 @@
             "schema": {
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
+          }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
           }
         }
       },
@@ -597,6 +828,52 @@
               "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
+        },
+        "headers": {
+          "x-request-id": {
+            "$ref": "#/components/headers/RequestIdHeader"
+          },
+          "x-actor": {
+            "$ref": "#/components/headers/ActorHeader"
+          }
+        }
+      }
+    },
+    "headers": {
+      "RequestIdHeader": {
+        "description": "Identificador unico da requisicao para rastreabilidade.",
+        "schema": {
+          "type": "string",
+          "example": "f25f63b8-2b89-4fc0-8a2e-7b2e8c7d6f53"
+        }
+      },
+      "ActorHeader": {
+        "description": "Ator identificado para a requisicao (header x-user/x-operator/x-username ou fallback).",
+        "schema": {
+          "type": "string",
+          "example": "PORTARIA"
+        }
+      }
+    },
+    "parameters": {
+      "RequestIdHeaderParam": {
+        "name": "x-request-id",
+        "in": "header",
+        "required": false,
+        "description": "Identificador unico da requisicao (enviado pelo cliente ou gerado pelo servidor).",
+        "schema": {
+          "type": "string",
+          "example": "f25f63b8-2b89-4fc0-8a2e-7b2e8c7d6f53"
+        }
+      },
+      "ActorHeaderParam": {
+        "name": "x-user",
+        "in": "header",
+        "required": false,
+        "description": "Identificacao do ator da operacao (ex.: PORTARIA).",
+        "schema": {
+          "type": "string",
+          "example": "PORTARIA"
         }
       }
     }

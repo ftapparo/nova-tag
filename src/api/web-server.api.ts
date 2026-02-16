@@ -9,6 +9,7 @@ import gateRoutes from '../routes/gate.routes';
 import cacheRoutes from '../routes/cache.routes';
 import { AntennaManager } from '../core/antenna-manager';
 import { responseHandler } from '../middleware/response-handler';
+import { requestContextMiddleware } from '../middleware/request-context';
 
 
 export async function StartWebServer(antennaInstance: AntennaManager): Promise<void> {
@@ -34,6 +35,7 @@ export async function StartWebServer(antennaInstance: AntennaManager): Promise<v
      * Middleware para parsear JSON nas requisições.
      */
     app.use(express.json());
+    app.use(requestContextMiddleware);
 
     /**
      * Middleware para padronizar respostas da API.
