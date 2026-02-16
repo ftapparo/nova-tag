@@ -55,11 +55,7 @@
             "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          }
-        ]
+        "parameters": []
       }
     },
     "/v2/api/healthcheck": {
@@ -92,11 +88,7 @@
             "$ref": "#/components/responses/ServiceUnavailable"
           }
         },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          }
-        ]
+        "parameters": []
       }
     },
     "/v2/api/gate/restart": {
@@ -146,11 +138,7 @@
             "$ref": "#/components/responses/InternalServerError"
           }
         },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          }
-        ]
+        "parameters": []
       }
     },
     "/v2/api/gate/state": {
@@ -180,11 +168,7 @@
             }
           }
         },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          }
-        ]
+        "parameters": []
       }
     },
     "/v2/api/gate/open": {
@@ -249,11 +233,7 @@
             "$ref": "#/components/responses/InternalServerError"
           }
         },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          }
-        ]
+        "parameters": []
       }
     },
     "/v2/api/gate/close": {
@@ -286,11 +266,7 @@
             "$ref": "#/components/responses/InternalServerError"
           }
         },
-        "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          }
-        ]
+        "parameters": []
       }
     },
     "/v2/api/cache": {
@@ -301,9 +277,6 @@
         "summary": "Lista o cache de TAGs",
         "description": "Lista o cache de TAGs. Use type=positive|negative|all|whitelist|blacklist.",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          },
           {
             "name": "type",
             "in": "query",
@@ -355,9 +328,6 @@
         "summary": "Limpa o cache de TAGs",
         "description": "Limpa o cache de TAGs. Use type=positive|negative|all|whitelist|blacklist.",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          },
           {
             "name": "type",
             "in": "query",
@@ -411,9 +381,6 @@
         "summary": "Remove uma TAG do cache",
         "description": "Remove uma TAG específica do cache (whitelist/blacklist).",
         "parameters": [
-          {
-            "$ref": "#/components/parameters/ActorHeaderParam"
-          },
           {
             "name": "tag",
             "in": "path",
@@ -826,29 +793,6 @@
           "type": "string",
           "example": "PORTARIA"
         }
-      }
-    },
-    "parameters": {
-      "RequestIdHeaderParam": {
-        "name": "x-request-id",
-        "in": "header",
-        "required": false,
-        "description": "Identificador unico da requisicao (enviado pelo cliente ou gerado pelo servidor).",
-        "schema": {
-          "type": "string",
-          "example": "f25f63b8-2b89-4fc0-8a2e-7b2e8c7d6f53"
-        }
-      },
-      "ActorHeaderParam": {
-        "name": "x-user",
-        "in": "header",
-        "required": false,
-        "description": "Identificacao do ator da operacao (ex.: PORTARIA).",
-        "schema": {
-          "type": "string",
-          "example": "PORTARIA"
-        },
-        "example": "SWAGGER"
       }
     }
   }
