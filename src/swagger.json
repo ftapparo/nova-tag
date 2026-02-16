@@ -38,85 +38,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "example": "API Funcionando!"
-                        },
-                        "environment": {
-                          "type": "string",
-                          "example": "development"
-                        },
-                        "antennaStatus": {
-                          "type": "string",
-                          "example": "OK"
-                        },
-                        "antennaHealthcheckPending": {
-                          "type": "boolean",
-                          "example": false
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponseHealth"
                 }
               }
             }
           },
           "503": {
-            "description": "Antena sem resposta no healthcheck",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "example": "API Funcionando!"
-                        },
-                        "environment": {
-                          "type": "string",
-                          "example": "development"
-                        },
-                        "antennaStatus": {
-                          "type": "string",
-                          "example": "HEALTHCHECK_PENDING"
-                        },
-                        "antennaHealthcheckPending": {
-                          "type": "boolean",
-                          "example": true
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Antena sem resposta no healthcheck."
-                    },
-                    "errors": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -134,85 +62,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "example": "API Funcionando!"
-                        },
-                        "environment": {
-                          "type": "string",
-                          "example": "development"
-                        },
-                        "antennaStatus": {
-                          "type": "string",
-                          "example": "OK"
-                        },
-                        "antennaHealthcheckPending": {
-                          "type": "boolean",
-                          "example": false
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponseHealth"
                 }
               }
             }
           },
           "503": {
-            "description": "Antena sem resposta no healthcheck",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "status": {
-                          "type": "string",
-                          "example": "API Funcionando!"
-                        },
-                        "environment": {
-                          "type": "string",
-                          "example": "development"
-                        },
-                        "antennaStatus": {
-                          "type": "string",
-                          "example": "HEALTHCHECK_PENDING"
-                        },
-                        "antennaHealthcheckPending": {
-                          "type": "boolean",
-                          "example": true
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Antena sem resposta no healthcheck."
-                    },
-                    "errors": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -247,57 +103,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": {
-                          "type": "string",
-                          "example": "Conexão com a antena reiniciada com sucesso."
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "500": {
-            "description": "Falha ao reiniciar conexão com a antena",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Falha ao reiniciar conexão com a antena."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/InternalServerError"
           }
         }
       }
@@ -315,33 +127,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "state": {
-                          "type": "string",
-                          "enum": [
-                            "OPEN",
-                            "CLOSED",
-                            "UNKNOWN"
-                          ],
-                          "example": "CLOSED"
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
@@ -391,83 +177,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": {
-                          "type": "string",
-                          "example": "Comando de abertura enviado com sucesso."
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Parâmetro inválido",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Parâmetro autoCloseTime inválido. Informe um número inteiro."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/BadRequest"
           },
           "500": {
-            "description": "Falha ao enviar comando",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Falha ao enviar comando para abrir o portão."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/InternalServerError"
           }
         }
       }
@@ -485,57 +204,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": {
-                          "type": "string",
-                          "example": "Comando de fechamento enviado com sucesso."
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "500": {
-            "description": "Falha ao enviar comando",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Falha ao enviar comando para fechar o portão."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/InternalServerError"
           }
         }
       }
@@ -571,145 +246,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "type": {
-                          "type": "string",
-                          "example": "positive"
-                        },
-                        "items": {
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "tag": {
-                                "type": "string",
-                                "example": "005646665"
-                              },
-                              "validatedAt": {
-                                "type": "string",
-                                "format": "date-time"
-                              },
-                              "isValid": {
-                                "type": "boolean",
-                                "example": true
-                              },
-                              "accessId": {
-                                "type": "string",
-                                "nullable": true,
-                                "example": "123456"
-                              },
-                              "verifyData": {
-                                "type": "object",
-                                "nullable": true,
-                                "example": {
-                                  "PERMITIDO": "S",
-                                  "NOME": "IGOR JOSE LIMA ROZANI",
-                                  "MIDIA": "TAG",
-                                  "DESCRICAO": "3 INQUILINO"
-                                }
-                              }
-                            }
-                          }
-                        },
-                        "stats": {
-                          "type": "object",
-                          "properties": {
-                            "positiveSize": {
-                              "type": "integer",
-                              "example": 1
-                            },
-                            "negativeSize": {
-                              "type": "integer",
-                              "example": 1
-                            },
-                            "positiveTimeout": {
-                              "type": "integer",
-                              "example": 300000
-                            },
-                            "negativeTimeout": {
-                              "type": "integer",
-                              "example": 60000
-                            }
-                          },
-                          "example": {
-                            "positiveSize": 1,
-                            "negativeSize": 1,
-                            "positiveTimeout": 300000,
-                            "negativeTimeout": 60000
-                          }
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Tipo de cache inválido",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Tipo de cache inválido. Use positive, negative, all, whitelist ou blacklist."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/BadRequest"
           },
           "503": {
-            "description": "TagValidator indisponível",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "TagValidator indisponível."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       },
@@ -743,87 +289,16 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": {
-                          "type": "string",
-                          "example": "Cache limpo com sucesso."
-                        },
-                        "type": {
-                          "type": "string",
-                          "example": "negative"
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Tipo de cache inválido",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "Tipo de cache inválido. Use positive, negative, all, whitelist ou blacklist."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/BadRequest"
           },
           "503": {
-            "description": "TagValidator indisponível",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "TagValidator indisponível."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/ServiceUnavailable"
           }
         }
       }
@@ -852,112 +327,274 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "properties": {
-                        "message": {
-                          "type": "string",
-                          "example": "TAG removida do cache com sucesso."
-                        },
-                        "tag": {
-                          "type": "string",
-                          "example": "005017758"
-                        }
-                      }
-                    },
-                    "message": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "TAG inválida",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "TAG inválida."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/BadRequest"
           },
           "404": {
-            "description": "TAG não encontrada no cache",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "TAG não encontrada no cache."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
-                }
-              }
-            }
+            "$ref": "#/components/responses/NotFound"
           },
           "503": {
-            "description": "TagValidator indisponível",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "data": {
-                      "type": "object",
-                      "nullable": true,
-                      "example": null
-                    },
-                    "message": {
-                      "type": "string",
-                      "example": "TagValidator indisponível."
-                    },
-                    "errors": {
-                      "type": "string",
-                      "nullable": true,
-                      "example": null
-                    }
-                  }
+            "$ref": "#/components/responses/ServiceUnavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ApiResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "errors": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
                 }
               }
+            ],
+            "example": null
+          }
+        }
+      },
+      "ApiErrorResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "type": "object"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "object"
+                }
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "example": null
+          },
+          "message": {
+            "type": "string",
+            "example": "Erro ao processar requisicao."
+          },
+          "errors": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            ],
+            "example": null
+          }
+        }
+      },
+      "HealthData": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "example": "API Funcionando!"
+          },
+          "environment": {
+            "type": "string",
+            "example": "development"
+          },
+          "antennaStatus": {
+            "type": "string",
+            "example": "OK"
+          },
+          "antennaHealthcheckPending": {
+            "type": "boolean",
+            "example": false
+          }
+        }
+      },
+      "ApiResponseHealth": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HealthData"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          },
+          "errors": {
+            "type": "string",
+            "nullable": true,
+            "example": null
+          }
+        }
+      },
+      "ApiHealthcheckPendingResponse": {
+        "type": "object",
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/HealthData"
+          },
+          "message": {
+            "type": "string",
+            "example": "Antena sem resposta no healthcheck."
+          },
+          "errors": {
+            "nullable": true,
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "object"
+              }
+            ],
+            "example": null
+          }
+        }
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "Requisicao invalida",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "Nao autorizado",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "Forbidden": {
+        "description": "Acesso negado",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "Recurso nao encontrado",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Conflito de estado",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "UnprocessableEntity": {
+        "description": "Entidade nao processavel",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "Muitas requisicoes",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "InternalServerError": {
+        "description": "Erro interno do servidor",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "BadGateway": {
+        "description": "Falha de gateway",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "ServiceUnavailable": {
+        "description": "Servico indisponivel",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
+            }
+          }
+        }
+      },
+      "GatewayTimeout": {
+        "description": "Tempo de resposta excedido",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ApiErrorResponse"
             }
           }
         }
