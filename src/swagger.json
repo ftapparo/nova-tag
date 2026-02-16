@@ -58,9 +58,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           }
         ]
       }
@@ -98,9 +95,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           }
         ]
       }
@@ -155,9 +149,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           }
         ]
       }
@@ -192,9 +183,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           }
         ]
       }
@@ -264,9 +252,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           }
         ]
       }
@@ -304,9 +289,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           }
         ]
       }
@@ -321,9 +303,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           },
           {
             "name": "type",
@@ -380,9 +359,6 @@
             "$ref": "#/components/parameters/ActorHeaderParam"
           },
           {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
-          },
-          {
             "name": "type",
             "in": "query",
             "required": false,
@@ -437,9 +413,6 @@
         "parameters": [
           {
             "$ref": "#/components/parameters/ActorHeaderParam"
-          },
-          {
-            "$ref": "#/components/parameters/RequestIdHeaderParam"
           },
           {
             "name": "tag",
@@ -874,7 +847,8 @@
         "schema": {
           "type": "string",
           "example": "PORTARIA"
-        }
+        },
+        "example": "SWAGGER"
       }
     }
   }
