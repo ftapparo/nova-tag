@@ -2,6 +2,21 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [2.0.1] - 2026-03-24
+
+### Corrigido
+- Race condition entre healthcheck e leitura de TAG: o comando de healthcheck era enviado pelo canal TCP no exato momento em que a antena transmitia dados de leitura, causando travamento de firmware e exigindo cold restart para recuperação.
+- Adicionado guard de timestamp (`HEALTHCHECK_GUARD_MS=2000`): se um dado foi recebido nos últimos 2 segundos, o healthcheck é suprimido e o timer de inatividade reseta sozinho quando o evento de dados pendente for processado.
+
+### Alterado
+- `HEALTHCHECK_TIMEOUT` aumentado de 10s para 30s para reduzir frequência de envio e flood na rede.
+
+### Adicionado
+- Variável de ambiente `HEALTHCHECK_GUARD_MS` (padrão: 2000ms) para configurar a janela de proteção.
+- Variável de ambiente `HEALTHCHECK_ENABLED` (padrão: true) como kill-switch para desabilitar o healthcheck sem necessidade de redeploy.
+
+---
+
 ## [2.0.0] - 2026-01-27
 ### Adicionado
 - Reestruturação completa da arquitetura do projeto com separação em camadas (controllers, core, routes, utils).
