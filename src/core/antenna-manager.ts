@@ -33,7 +33,9 @@ dotenv.config();
 
 // Constantes de operação: intervalo de healthcheck, contagem máxima antes de enviar healthcheck,
 // e os comandos em buffer para abrir/fechar portão e healthcheck
-const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_TIMEOUT) || 10000;
+const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_TIMEOUT) || 30000;
+const HEALTHCHECK_GUARD_MS = Number(process.env.HEALTHCHECK_GUARD_MS) || 500;
+const HEALTHCHECK_ENABLED = process.env.HEALTHCHECK_ENABLED !== 'false';
 const ATTEMPT_RECONNECT = Number(process.env.ATTEMPT_RECONNECT) || 3;
 const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
 const RECENT_AUTHORIZED_LIMIT = Number(process.env.RECENT_AUTHORIZED_LIMIT) || 3;
@@ -44,6 +46,7 @@ const FILTER_CMD = Buffer.from(String(process.env.FILTER_DATA) || "", "hex");
 
 // Variáveis de controle do estado da aplicação
 let healthCheckWaitResponse = false;
+let lastDataTimestamp: number = 0;
 let gateState: GateState = GateState.CLOSED;
 let closeGateTimeout: NodeJS.Timeout | null = null;
 let isReconnecting = false;
@@ -108,6 +111,7 @@ export class AntennaManager {
 
       // Reset de variáveis de estado ao conectar
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
+      lastDataTimestamp = 0;            //reseta o timestamp do último dado recebido
       gateState = GateState.CLOSED;     //estado do portão fechado
       isReconnecting = false;           //indica que não está reconectando
 
@@ -139,6 +143,7 @@ export class AntennaManager {
       const hexData = data.toString("hex");   // Converte os dados recebidos para hexadecimal
       connectionRetry = 0;                    // Reseta o contador de tentativas de conexão
       healthCheckWaitResponse = false;        // Reseta o estado de espera por resposta do healthcheck
+      lastDataTimestamp = Date.now();         // Registra o momento do último dado recebido
 
       //logger.debug(`Mensagem: ${hexData}`);
 
@@ -195,9 +200,23 @@ export class AntennaManager {
     // Evento de inatividade (timeout) no socket
     client.on("timeout", () => {
 
+      // Guard: se um dado foi recebido recentemente, o timeout disparou concorrente com uma
+      // transmissão da antena. Enviar healthcheck agora travaria o firmware. O timer de
+      // inatividade vai resetar sozinho quando o evento data pendente for processado.
+      const msSinceLastData = Date.now() - lastDataTimestamp;
+      if (lastDataTimestamp > 0 && msSinceLastData < HEALTHCHECK_GUARD_MS) {
+        logger.debug(`[TIMEOUT] Ignorado: dado recebido há ${msSinceLastData}ms`);
+        return;
+      }
+
       if (gateState === GateState.OPEN) {
         logger.debug(`[TIMEOUT] Portão travado aberto. Reiniciando conexão.`);
         setImmediate(() => this.antennaSocket.destroy());
+        return;
+      }
+
+      if (!HEALTHCHECK_ENABLED) {
+        logger.debug(`[TIMEOUT] Healthcheck desabilitado por configuração`);
         return;
       }
 
