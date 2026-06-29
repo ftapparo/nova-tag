@@ -37,6 +37,7 @@ const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_TIMEOUT) || 30000;
 const HEALTHCHECK_GUARD_MS = Number(process.env.HEALTHCHECK_GUARD_MS) || 500;
 const HEALTHCHECK_ENABLED = process.env.HEALTHCHECK_ENABLED !== 'false';
 const ATTEMPT_RECONNECT = Number(process.env.ATTEMPT_RECONNECT) || 3;
+const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS) || 10000;
 const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
 const RECENT_AUTHORIZED_LIMIT = Number(process.env.RECENT_AUTHORIZED_LIMIT) || 3;
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
@@ -106,8 +107,19 @@ export class AntennaManager {
     });
     tagValidator = new TagValidator();
 
+    // Timeout de conexão: se o handshake TCP não completar nem falhar a tempo,
+    // o socket travaria indefinidamente sem disparar "close" ou "error", impedindo
+    // a reconexão e mantendo o container "unhealthy" para sempre sem reiniciar.
+    client.setTimeout(CONNECT_TIMEOUT_MS);
+    const onConnectTimeout = () => {
+      logger.issue(`[ERROR] Timeout ao conectar na antena [${this.antenna.ip}]`);
+      client.destroy();
+    };
+    client.once("timeout", onConnectTimeout);
+
     // Evento da conexão do socket
     client.connect(this.antenna.port, this.antenna.ip, () => {
+      client.removeListener("timeout", onConnectTimeout);
 
       // Reset de variáveis de estado ao conectar
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck

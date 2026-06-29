@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: nova-tag-tag1
     restart: unless-stopped
+    labels:
+      - "autoheal=true"
     ports:
       - "4009:4000"
     environment:
@@ -35,8 +37,10 @@ services:
       dockerfile: Dockerfile
     container_name: nova-tag-tag2
     restart: unless-stopped
+    labels:
+      - "autoheal=true"
     ports:
-      - "4010:4000"   
+      - "4010:4000"
     environment:
       - NODE_ENV=production
       - TAG_ID=TAG2
@@ -58,6 +62,19 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: nova-tag-autoheal
+    restart: unless-stopped
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=autoheal
+      - AUTOHEAL_INTERVAL=10
+      - AUTOHEAL_START_PERIOD=40
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - nova-network
 
 networks:
   nova-network:

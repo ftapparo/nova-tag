@@ -2,6 +2,21 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [2.0.2] - 2026-06-29
+
+### Corrigido
+- Conexão TCP travada indefinidamente: quando `client.connect()` não completava nem falhava (handshake travado), o socket ficava pendurado sem disparar `close` ou `error`, impedindo a reconexão automática e mantendo o container `unhealthy` no Docker sem nunca ser reiniciado.
+- Adicionado timeout explícito de conexão (`CONNECT_TIMEOUT_MS`, padrão 10s): se o handshake TCP não completar a tempo, o socket é destruído e o fluxo normal de reconexão/contagem de tentativas é acionado, garantindo que o processo eventualmente chame `process.exit(1)` em falha persistente.
+
+### Adicionado
+- Variável de ambiente `CONNECT_TIMEOUT_MS` (padrão: 10000ms) para configurar o tempo limite de conexão TCP com a antena.
+- Serviço `autoheal` (`willfarrell/autoheal`) no `docker-compose.yml` como rede de segurança: monitora containers marcados com o label `autoheal=true` e força reinício via Docker quando o healthcheck reporta `unhealthy`, já que `restart: unless-stopped` não reage a esse status por padrão.
+
+### Alterado
+- Containers `nova-tag-tag1` e `nova-tag-tag2` agora possuem o label `autoheal=true` para serem monitorados pelo serviço `autoheal`.
+
+---
+
 ## [2.0.1] - 2026-03-24
 
 ### Corrigido
