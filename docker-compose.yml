@@ -72,7 +72,7 @@ services:
       - AUTOHEAL_INTERVAL=10
       - AUTOHEAL_START_PERIOD=40
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
+      - //var/run/docker.sock:/var/run/docker.sock
     networks:
       - nova-network
 

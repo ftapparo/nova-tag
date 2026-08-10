@@ -15,6 +15,9 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 ### Alterado
 - Containers `nova-tag-tag1` e `nova-tag-tag2` agora possuem o label `autoheal=true` para serem monitorados pelo serviço `autoheal`.
 
+### Corrigido (hotfix)
+- Volume do socket Docker no serviço `autoheal` corrigido de `/var/run/docker.sock` para `//var/run/docker.sock` (caminho compatível com Docker Desktop no Windows). O path incorreto impedia o autoheal de acessar o daemon Docker, causando crash em loop do próprio container autoheal.
+
 ---
 
 ## [2.0.1] - 2026-03-24
