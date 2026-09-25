@@ -13,8 +13,9 @@ services:
       - NODE_ENV=production
       - TAG_ID=TAG1
       - PORT=4000
-    env_file:
-      - .env
+    # env_file removido: no Portainer (stack via Git), o .env nao esta no
+    # clone (fica no .gitignore por conter segredos). As variaveis vem do
+    # campo "Environment variables" da stack.
     volumes:
       - C:/Servidor/docker/logs:/app/logs
     networks:
@@ -45,8 +46,9 @@ services:
       - NODE_ENV=production
       - TAG_ID=TAG2
       - PORT=4000
-    env_file:
-      - .env
+    # env_file removido: no Portainer (stack via Git), o .env nao esta no
+    # clone (fica no .gitignore por conter segredos). As variaveis vem do
+    # campo "Environment variables" da stack.
     volumes:
       - C:/Servidor/docker/logs:/app/logs
     networks:
