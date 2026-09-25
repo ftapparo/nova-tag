@@ -9,13 +9,27 @@ services:
       - "autoheal=true"
     ports:
       - "4009:4000"
+    # env_file removido: no Portainer (stack via Git), o .env nao esta no
+    # clone (fica no .gitignore por conter segredos).
+    #
+    # IMPORTANTE: "Environment variables" da stack no Portainer NAO injeta
+    # variaveis no container automaticamente - elas so ficam disponiveis
+    # para interpolacao do compose (as referencias abaixo). Cada uma precisa
+    # ser listada aqui explicitamente para chegar ao processo do container.
     environment:
       - NODE_ENV=production
       - TAG_ID=TAG1
       - PORT=4000
-    # env_file removido: no Portainer (stack via Git), o .env nao esta no
-    # clone (fica no .gitignore por conter segredos). As variaveis vem do
-    # campo "Environment variables" da stack.
+      - API_BASE_URL=${API_BASE_URL}
+      - HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT}
+      - CONNECT_TIMEOUT_MS=${CONNECT_TIMEOUT_MS}
+      - HEALTHCHECK_GUARD_MS=${HEALTHCHECK_GUARD_MS}
+      - GATE_TIMEOUT_TO_CLOSE=${GATE_TIMEOUT_TO_CLOSE}
+      - ATTEMPT_RECONNECT=${ATTEMPT_RECONNECT}
+      - SHUTDOWN_DELAY_MS=${SHUTDOWN_DELAY_MS}
+      - FILTER_DATA=${FILTER_DATA}
+      - LOG_TO_FILE=${LOG_TO_FILE}
+      - LOG_DIR=${LOG_DIR}
     volumes:
       - C:/Servidor/docker/logs:/app/logs
     networks:
@@ -42,13 +56,27 @@ services:
       - "autoheal=true"
     ports:
       - "4010:4000"
+    # env_file removido: no Portainer (stack via Git), o .env nao esta no
+    # clone (fica no .gitignore por conter segredos).
+    #
+    # IMPORTANTE: "Environment variables" da stack no Portainer NAO injeta
+    # variaveis no container automaticamente - elas so ficam disponiveis
+    # para interpolacao do compose (as referencias abaixo). Cada uma precisa
+    # ser listada aqui explicitamente para chegar ao processo do container.
     environment:
       - NODE_ENV=production
       - TAG_ID=TAG2
       - PORT=4000
-    # env_file removido: no Portainer (stack via Git), o .env nao esta no
-    # clone (fica no .gitignore por conter segredos). As variaveis vem do
-    # campo "Environment variables" da stack.
+      - API_BASE_URL=${API_BASE_URL}
+      - HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT}
+      - CONNECT_TIMEOUT_MS=${CONNECT_TIMEOUT_MS}
+      - HEALTHCHECK_GUARD_MS=${HEALTHCHECK_GUARD_MS}
+      - GATE_TIMEOUT_TO_CLOSE=${GATE_TIMEOUT_TO_CLOSE}
+      - ATTEMPT_RECONNECT=${ATTEMPT_RECONNECT}
+      - SHUTDOWN_DELAY_MS=${SHUTDOWN_DELAY_MS}
+      - FILTER_DATA=${FILTER_DATA}
+      - LOG_TO_FILE=${LOG_TO_FILE}
+      - LOG_DIR=${LOG_DIR}
     volumes:
       - C:/Servidor/docker/logs:/app/logs
     networks:
