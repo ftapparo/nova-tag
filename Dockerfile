@@ -31,7 +31,10 @@ RUN npm install --only=production && \
 
 # Copia build da stage anterior
 COPY --from=builder /app/dist ./dist
-COPY .env ./.env
+
+# .env NAO e copiado para a imagem: gravaria segredos numa camada visivel a
+# qualquer "docker history". As variaveis chegam em runtime, via Environment
+# variables da stack no Portainer.
 
 # Cria diretório para logs
 RUN mkdir -p logs
