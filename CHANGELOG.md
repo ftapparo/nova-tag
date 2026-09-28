@@ -12,6 +12,7 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 
 ### Alterado
 - Reorganização estrutural do código: `controllers/`, `routes/`, `middleware/` e `api/` movidos para `src/v2/` (camada Express atual, sem mudança de comportamento). `utils/` movido para dentro de `src/core/`, junto do driver real da antena (`antenna-manager`, `gate-controller`, `tag-validator`), que já vivia em `core/`. Preparação para uma futura v3 (Fastify + Zod, pensada para consumo mobile), que vai compartilhar a mesma instância `AntennaManager` — a conexão TCP com a antena é única e não pode ser duplicada.
+- `src/v3/` reorganizado por feature, seguindo `AI-Friendly Architecture Specification.md` (raiz do workspace): `routes/` e `lib/` viraram `health/`, `gate/`, `cache/` (uma pasta por feature) e `shared/` (só o que é genuinamente transversal — `response.ts`, `reply-helpers.ts`, `service-auth.ts`, `tag.schema.ts`, este último compartilhado por `gate/` e `cache/`). Sem mudança de comportamento.
 
 ## [2.0.2] - 2026-06-29
 

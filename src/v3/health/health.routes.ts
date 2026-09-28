@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { isHealthcheckAwaitingResponse } from '../../core/antenna-manager';
-import { successResponseSchema } from '../lib/response';
+import { successResponseSchema } from '../shared/response';
 
 // Reaproveita o mesmo estado que a v2 usa (isHealthcheckAwaitingResponse,
 // de core/antenna-manager) — health da v3 reflete o estado real da antena,

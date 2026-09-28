@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import type { AntennaManager } from '../../core/antenna-manager';
-import { successResponseSchema } from '../lib/response';
-import { gateStateSchema } from '../lib/tag-schemas';
+import { successResponseSchema } from '../shared/response';
+import { gateStateSchema } from '../shared/tag.schema';
 
 /**
  * Rota de leitura do estado do portão na v3. Reaproveita o getter

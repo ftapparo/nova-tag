@@ -4,11 +4,11 @@ import fastifySwaggerUi from '@fastify/swagger-ui';
 import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fastify-type-provider-zod';
 import logger from '../core/utils/logger';
 import { AntennaManager } from '../core/antenna-manager';
-import { healthRoutes } from './routes/health.routes';
-import { gateRoutes } from './routes/gate.routes';
-import { cacheRoutes } from './routes/cache.routes';
-import { registerErrorHandler, responseHelpersPlugin } from './lib/reply-helpers';
-import { registerServiceAuth } from './lib/service-auth';
+import { healthRoutes } from './health/health.routes';
+import { gateRoutes } from './gate/gate.routes';
+import { cacheRoutes } from './cache/cache.routes';
+import { registerErrorHandler, responseHelpersPlugin } from './shared/reply-helpers';
+import { registerServiceAuth } from './shared/service-auth';
 import openapiDocument from './openapi.json';
 
 /**
@@ -31,7 +31,7 @@ export async function StartWebServerV3(antennaInstance: AntennaManager): Promise
     app.setSerializerCompiler(serializerCompiler);
 
     // Mecanismo de resposta padrão da v3 (reply.ok()/reply.fail()) e
-    // tratamento central de erro — ver src/v3/lib/response.ts para o
+    // tratamento central de erro — ver src/v3/shared/response.ts para o
     // desenho completo do envelope.
     await app.register(responseHelpersPlugin);
     registerErrorHandler(app);
@@ -39,7 +39,7 @@ export async function StartWebServerV3(antennaInstance: AntennaManager): Promise
     // Autenticação de serviço: só a nova-api (rede interna) conhece
     // TAG_SERVICE_TOKEN e pode chamar estas rotas. Autorização por
     // usuário/role continua sendo decidida na nova-api antes de repassar
-    // a chamada — ver src/v3/lib/service-auth.ts.
+    // a chamada — ver src/v3/shared/service-auth.ts.
     registerServiceAuth(app);
 
     // Flag própria da v3 (independente de qualquer flag da v2). Spec

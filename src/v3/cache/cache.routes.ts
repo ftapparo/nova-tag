@@ -2,8 +2,8 @@ import type { FastifyInstance } from 'fastify';
 import type { ZodTypeProvider } from 'fastify-type-provider-zod';
 import { z } from 'zod';
 import { getTagValidatorInstance } from '../../core/antenna-manager';
-import { successResponseSchema } from '../lib/response';
-import { cacheTypeQuerySchema, listCacheDataSchema } from '../lib/tag-schemas';
+import { successResponseSchema } from '../shared/response';
+import { cacheTypeQuerySchema, listCacheDataSchema } from '../shared/tag.schema';
 
 const normalizeCacheType = (type: string): 'positive' | 'negative' | 'all' => {
     if (type === 'positive' || type === 'whitelist') return 'positive';
