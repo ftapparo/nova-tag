@@ -64,3 +64,11 @@ Quando (e somente quando) o usuário disser algo como "versionar", "criar uma ve
 3. Crie uma nova seção `## [Unreleased]` vazia no topo, para o próximo ciclo.
 4. Atualize `"version"` no `package.json` do projeto para o mesmo número.
 5. Apresente esse commit de versionamento separadamente dos demais (não misture com commits de código), seguindo o mesmo fluxo de aprovação das etapas 5 e 6.
+
+## 8. Padrões compartilhados entre os 4 projetos (API, TAG, CIE, FRONT)
+
+Alguns padrões são deliberadamente idênticos nos quatro repositórios do ecossistema Nova Residence — hoje isso inclui o **modelo de resposta da v3** (`docs/PADRAO-RESPOSTA-V3.md`, na raiz do workspace) e este próprio fluxo de commit. Outros podem se juntar a essa lista no futuro.
+
+Sempre que uma mudança tocar em algo que é (ou deveria ser) um padrão compartilhado — não uma particularidade deste projeto —, **pergunte ao usuário se a mudança deve ser replicada nos outros projetos** antes de considerar o trabalho concluído. Não replique automaticamente sem perguntar, e não deixe de perguntar por padrão (o padrão diverge silenciosamente entre projetos se ninguém perguntar).
+
+Sinal de que algo é "padrão compartilhado": a documentação de referência vive fora deste repositório (na raiz do workspace, não em `docs/` local), ou o próprio código/comentário diz explicitamente "vale para os 3 backends" / "mesmo padrão dos outros projetos".
