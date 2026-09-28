@@ -4,7 +4,7 @@
 
 **Sistema inteligente de automação para controle de acesso veicular via RFID**
 
-[![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)](https://github.com/ftapparo/nova-tag)
+[![Version](https://img.shields.io/badge/version-2.0.2-blue.svg)](https://github.com/ftapparo/nova-tag)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8-blue)](https://www.typescriptlang.org/)
 [![Node](https://img.shields.io/badge/Node-20.x-green)](https://nodejs.org/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -80,30 +80,32 @@
 
 ## 🏗️ Arquitetura
 
-O projeto segue uma **arquitetura em camadas** com separação clara de responsabilidades:
+O projeto separa a lógica de negócio (agnóstica de framework HTTP) da camada de API:
 
 ```
 ┌─────────────────────────────────────────────┐
-│          API REST (Express)                 │
+│          v2/ — API REST (Express)            │
 │  Rotas, Controllers, Middleware, Swagger    │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────▼───────────────────────────┐
-│          Core Business Logic                │
+│          core/ — Core Business Logic         │
 │  AntennaManager, GateController,            │
-│  TagValidator                                │
+│  TagValidator, Logger                        │
 └─────────────────┬───────────────────────────┘
                   │
 ┌─────────────────▼───────────────────────────┐
 │          Integrations                       │
 │  Socket TCP (RFID), External API,           │
-│  PM2+ Metrics, Logger                       │
+│  PM2+ Metrics                                │
 └─────────────────────────────────────────────┘
 ```
 
+`core/` não depende do Express nem de nenhum framework HTTP: `AntennaManager` é criado uma única vez no `server.ts` e injetado na camada de API (`StartWebServer(antennaInstance)`). Isso permite que uma futura v3 (Fastify + Zod, pensada para consumo mobile) rode lado a lado com a v2 no mesmo processo, compartilhando a mesma conexão TCP com a antena — que só pode existir uma vez por processo.
+
 ### Camadas do Sistema
 
-**API Layer** (`src/api/`, `src/routes/`, `src/controllers/`)
+**API Layer** (`src/v2/api/`, `src/v2/routes/`, `src/v2/controllers/`, `src/v2/middleware/`)
 - Exposição de endpoints REST
 - Validação de requisições
 - Tratamento de erros HTTP
@@ -111,14 +113,10 @@ O projeto segue uma **arquitetura em camadas** com separação clara de responsa
 
 **Core Layer** (`src/core/`)
 - Lógica de negócio principal
-- Gerenciamento de conexão com antena
-- Controle de estado do portão
-- Validação de TAGs
-
-**Utils Layer** (`src/utils/`)
-- Logger estruturado
-- Utilitários compartilhados
-- Configurações globais
+- Gerenciamento de conexão com antena (`antenna-manager.ts`)
+- Controle de estado do portão (`gate-controller.ts`)
+- Validação de TAGs (`tag-validator.ts`)
+- Logger estruturado (`core/utils/logger.ts`)
 
 ---
 
@@ -362,11 +360,7 @@ A documentação Swagger permite:
 - ✅ Ver exemplos de requisições e respostas
 - ✅ Entender os modelos de dados
 
-### Gerar Documentação Atualizada
-
-```bash
-npm run swagger
-```
+A especificação é mantida manualmente em `src/v2/swagger.json`.
 
 ---
 
@@ -484,22 +478,27 @@ services:
 nova-tag/
 ├── src/
 │   ├── server.ts                 # Entry point da aplicação
-│   ├── swagger.ts                # Gerador de documentação Swagger
-│   ├── swagger.json              # Especificação OpenAPI gerada
-│   ├── api/
-│   │   └── web-server.api.ts     # Inicialização do servidor Express
-│   ├── controllers/
-│   │   ├── gate.controller.ts    # Controller para operações do portão
-│   │   └── health.controller.ts  # Controller para healthcheck
-│   ├── core/
+│   ├── core/                     # Lógica de negócio, sem framework HTTP
 │   │   ├── antenna-manager.ts    # Gerenciamento de conexão com antena
 │   │   ├── gate-controller.ts    # Lógica de controle do portão
-│   │   └── tag-validator.ts      # Validação de TAGs com API externa
-│   ├── routes/
-│   │   ├── gate.routes.ts        # Rotas do portão
-│   │   └── health.routes.ts      # Rotas de healthcheck
-│   └── utils/
-│       └── logger.ts             # Sistema de logs estruturado
+│   │   ├── tag-validator.ts      # Validação de TAGs com API externa
+│   │   └── utils/
+│   │       └── logger.ts         # Sistema de logs estruturado
+│   └── v2/                       # API REST (Express)
+│       ├── swagger.json          # Especificação OpenAPI gerada
+│       ├── api/
+│       │   └── web-server.api.ts # Inicialização do servidor Express
+│       ├── controllers/
+│       │   ├── gate.controller.ts    # Controller para operações do portão
+│       │   ├── cache.controller.ts   # Controller de cache/estado
+│       │   └── health.controller.ts  # Controller para healthcheck
+│       ├── middleware/
+│       │   ├── request-context.ts
+│       │   └── response-handler.ts
+│       └── routes/
+│           ├── gate.routes.ts        # Rotas do portão
+│           ├── cache.routes.ts
+│           └── health.routes.ts      # Rotas de healthcheck
 ├── bkp/                          # Arquivos de backup (versão anterior)
 ├── logs/                         # Logs gerados por antena
 │   ├── TAG1/
@@ -639,7 +638,7 @@ curl -X POST http://localhost:4009/api/gate/close
 
 Para ver o histórico completo de versões e alterações, consulte o [CHANGELOG.md](CHANGELOG.md).
 
-**Versão Atual:** 2.0.0 (27/01/2026)
+**Versão Atual:** 2.0.2 (29/06/2026)
 
 ---
 

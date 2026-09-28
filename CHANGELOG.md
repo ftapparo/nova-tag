@@ -2,6 +2,11 @@
 
 Todas as mudanças neste projeto são documentadas neste arquivo.
 
+## [Unreleased]
+
+### Alterado
+- Reorganização estrutural do código: `controllers/`, `routes/`, `middleware/` e `api/` movidos para `src/v2/` (camada Express atual, sem mudança de comportamento). `utils/` movido para dentro de `src/core/`, junto do driver real da antena (`antenna-manager`, `gate-controller`, `tag-validator`), que já vivia em `core/`. Preparação para uma futura v3 (Fastify + Zod, pensada para consumo mobile), que vai compartilhar a mesma instância `AntennaManager` — a conexão TCP com a antena é única e não pode ser duplicada.
+
 ## [2.0.2] - 2026-06-29
 
 ### Corrigido
