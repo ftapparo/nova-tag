@@ -39,8 +39,8 @@ COPY --from=builder /app/dist ./dist
 # Cria diretório para logs
 RUN mkdir -p logs
 
-# Expõe as portas das duas instâncias
-EXPOSE 4000
+# Expõe as portas das duas instâncias (v2) e a porta interna da v3
+EXPOSE 4000 3031
 
 # Define variáveis de ambiente padrão
 ENV NODE_ENV=production

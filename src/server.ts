@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import axios from 'axios';
 import { StartWebServer } from './v2/api/web-server.api';
+import { StartWebServerV3 } from './v3/server';
 import { AntennaManager, AntennaConfig } from './core/antenna-manager';
 
 // Carrega variáveis de ambiente (.env é opcional em Docker)
@@ -78,6 +79,16 @@ async function startService(): Promise<void> {
 
         await StartWebServer(antennaInstance);
         console.log(`[Server] WebServer ativo na porta ${port}`);
+
+        // v3 (Fastify) — roda lado a lado da v2, porta propria, ainda em
+        // construcao. Falha aqui nao deve derrubar a v2, que ja atende
+        // producao.
+        try {
+            await StartWebServerV3(antennaInstance);
+            console.log('[Server] WebServer v3 inicializado.');
+        } catch (v3Err) {
+            console.error('[Server] Falha ao iniciar a v3 (nao fatal, v2 segue operando):', v3Err);
+        }
 
     } catch (err) {
         console.error(`[Server] Erro fatal na inicialização (${antenna.name})`, err);

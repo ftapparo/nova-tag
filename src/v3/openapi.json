@@ -1,0 +1,258 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Nova Tag — v3",
+    "version": "3.0.0",
+    "description": "API v3 - Controle de Acesso RFID Nova Residence"
+  },
+  "tags": [
+    {
+      "name": "Health",
+      "description": "Disponibilidade do serviço e status da conexão com a antena."
+    }
+  ],
+  "components": {
+    "schemas": {
+      "ResponseMeta": {
+        "type": "object",
+        "description": "Metadado transversal presente em toda resposta, dentro ou fora do envelope de sucesso/erro.",
+        "properties": {
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Instante em que a resposta foi gerada.",
+            "example": "2026-09-28T03:44:40.342Z"
+          },
+          "requestId": {
+            "type": "string",
+            "nullable": true,
+            "description": "Identificador da requisição, para correlação em logs e suporte.",
+            "example": "req-1"
+          },
+          "version": {
+            "type": "string",
+            "enum": ["v3"],
+            "description": "Versão da API que gerou a resposta."
+          },
+          "pagination": {
+            "type": "object",
+            "description": "Presente somente em endpoints que retornam uma coleção paginada.",
+            "properties": {
+              "limit": { "type": "integer", "minimum": 1, "example": 25 },
+              "offset": { "type": "integer", "minimum": 0, "example": 0 },
+              "total": { "type": "integer", "minimum": 0, "example": 137 }
+            },
+            "required": ["limit", "offset", "total"]
+          }
+        },
+        "required": ["timestamp", "requestId", "version"]
+      },
+      "ProblemDetails": {
+        "type": "object",
+        "description": "Estrutura padrão de erro da API, com tipo, título, status HTTP e detalhe da ocorrência.",
+        "properties": {
+          "type": {
+            "type": "string",
+            "description": "URN fixo identificando o tipo do erro (não é uma URL navegável).",
+            "example": "urn:nova-tag:validation-error"
+          },
+          "title": {
+            "type": "string",
+            "description": "Resumo legível do tipo de erro.",
+            "example": "Dados de entrada inválidos"
+          },
+          "status": {
+            "type": "integer",
+            "description": "Código HTTP correspondente, redundante com o status da resposta.",
+            "example": 400
+          },
+          "detail": {
+            "type": "string",
+            "nullable": true,
+            "description": "Explicação específica desta ocorrência do erro.",
+            "example": "Um ou mais campos da requisição são inválidos."
+          },
+          "instance": {
+            "type": "string",
+            "nullable": true,
+            "description": "Path da requisição que originou o erro.",
+            "example": "/v3/api/health"
+          },
+          "validationErrors": {
+            "type": "array",
+            "description": "Presente somente quando type = validation-error.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "path": { "type": "string", "example": "/name" },
+                "message": { "type": "string", "example": "Too small: expected string to have >=3 characters" }
+              },
+              "required": ["path", "message"]
+            }
+          }
+        },
+        "required": ["type", "title", "status", "detail", "instance"]
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [false] },
+          "error": { "$ref": "#/components/schemas/ProblemDetails" },
+          "meta": { "$ref": "#/components/schemas/ResponseMeta" }
+        },
+        "required": ["success", "error", "meta"]
+      },
+      "HealthData": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["API Funcionando!"],
+            "example": "API Funcionando!"
+          },
+          "environment": {
+            "type": "string",
+            "description": "Valor de NODE_ENV do processo.",
+            "example": "production"
+          },
+          "antennaStatus": {
+            "type": "string",
+            "enum": ["OK", "HEALTHCHECK_PENDING"],
+            "description": "Estado do healthcheck TCP com a antena.",
+            "example": "OK"
+          },
+          "antennaHealthcheckPending": {
+            "type": "boolean",
+            "description": "Indica se um healthcheck enviado à antena ainda aguarda resposta.",
+            "example": false
+          }
+        },
+        "required": ["status", "environment", "antennaStatus", "antennaHealthcheckPending"]
+      },
+      "HealthResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "data": { "$ref": "#/components/schemas/HealthData" },
+          "meta": { "$ref": "#/components/schemas/ResponseMeta" }
+        },
+        "required": ["success", "data", "meta"]
+      }
+    },
+    "responses": {
+      "NotFound": {
+        "description": "Rota inexistente.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "success": false,
+              "error": {
+                "type": "urn:nova-tag:not-found",
+                "title": "Recurso não encontrado",
+                "status": 404,
+                "detail": "Rota GET /v3/api/rota-que-nao-existe não existe.",
+                "instance": "/v3/api/rota-que-nao-existe"
+              },
+              "meta": {
+                "timestamp": "2026-09-28T03:24:14.989Z",
+                "requestId": "req-2",
+                "version": "v3"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "paths": {
+    "/v3/api/health": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Healthcheck do serviço",
+        "description": "Verifica disponibilidade da camada HTTP e o estado da conexão TCP com a antena. Retorna 503 quando um healthcheck enviado à antena está pendente de resposta.",
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "description": "Serviço e antena operando normalmente.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "success": true,
+                  "data": { "status": "API Funcionando!", "environment": "production", "antennaStatus": "OK", "antennaHealthcheckPending": false },
+                  "meta": {
+                    "timestamp": "2026-09-28T03:44:40.342Z",
+                    "requestId": "req-1",
+                    "version": "v3"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Antena sem resposta ao healthcheck enviado.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "success": true,
+                  "data": { "status": "API Funcionando!", "environment": "production", "antennaStatus": "HEALTHCHECK_PENDING", "antennaHealthcheckPending": true },
+                  "meta": {
+                    "timestamp": "2026-09-28T03:44:40.342Z",
+                    "requestId": "req-1",
+                    "version": "v3"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v3/api/healthcheck": {
+      "get": {
+        "tags": ["Health"],
+        "summary": "Healthcheck do serviço (alias)",
+        "description": "Alias de /v3/api/health. Mesmo handler e resposta, mantido por compatibilidade de convenção com a v2.",
+        "operationId": "getHealthcheck",
+        "responses": {
+          "200": {
+            "description": "Serviço e antena operando normalmente.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "success": true,
+                  "data": { "status": "API Funcionando!", "environment": "production", "antennaStatus": "OK", "antennaHealthcheckPending": false },
+                  "meta": {
+                    "timestamp": "2026-09-28T03:44:40.342Z",
+                    "requestId": "req-1",
+                    "version": "v3"
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Antena sem resposta ao healthcheck enviado.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/HealthResponse" },
+                "example": {
+                  "success": true,
+                  "data": { "status": "API Funcionando!", "environment": "production", "antennaStatus": "HEALTHCHECK_PENDING", "antennaHealthcheckPending": true },
+                  "meta": {
+                    "timestamp": "2026-09-28T03:44:40.342Z",
+                    "requestId": "req-1",
+                    "version": "v3"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

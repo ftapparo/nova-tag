@@ -9,6 +9,10 @@ services:
       - "autoheal=true"
     ports:
       - "4009:4000"
+      # v3 (Fastify) — em construcao, ainda sem rota publica dedicada no
+      # Cloudflare Tunnel. Porta interna 3031 igual nos dois containers
+      # (TAG1/TAG2), mapeada para portas externas diferentes.
+      - "4019:3031"
     # env_file removido: no Portainer (stack via Git), o .env nao esta no
     # clone (fica no .gitignore por conter segredos).
     #
@@ -20,6 +24,8 @@ services:
       - NODE_ENV=production
       - TAG_ID=TAG1
       - PORT=4000
+      - PORT_V3=3031
+      - SWAGGER_V3_ENABLED=${SWAGGER_V3_ENABLED}
       - API_BASE_URL=${API_BASE_URL}
       - HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT}
       - CONNECT_TIMEOUT_MS=${CONNECT_TIMEOUT_MS}
@@ -56,6 +62,10 @@ services:
       - "autoheal=true"
     ports:
       - "4010:4000"
+      # v3 (Fastify) — em construcao, ainda sem rota publica dedicada no
+      # Cloudflare Tunnel. Porta interna 3031 igual nos dois containers
+      # (TAG1/TAG2), mapeada para portas externas diferentes.
+      - "4020:3031"
     # env_file removido: no Portainer (stack via Git), o .env nao esta no
     # clone (fica no .gitignore por conter segredos).
     #
@@ -67,6 +77,8 @@ services:
       - NODE_ENV=production
       - TAG_ID=TAG2
       - PORT=4000
+      - PORT_V3=3031
+      - SWAGGER_V3_ENABLED=${SWAGGER_V3_ENABLED}
       - API_BASE_URL=${API_BASE_URL}
       - HEALTHCHECK_TIMEOUT=${HEALTHCHECK_TIMEOUT}
       - CONNECT_TIMEOUT_MS=${CONNECT_TIMEOUT_MS}
