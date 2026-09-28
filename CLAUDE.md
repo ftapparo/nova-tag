@@ -2,7 +2,7 @@
 
 Serviço de controle de acesso veicular via RFID do Condomínio Nova Residence. Comunicação TCP de baixo nível com antenas RFID físicas, validação de TAGs contra a `nova-api`, controle automático de portões.
 
-Veja `README.md` para visão completa (arquitetura, endpoints, monitoramento) e `CHANGELOG.md` para o histórico. Este arquivo é o contexto operacional para trabalhar no código.
+Veja `README.md` para visão completa (arquitetura, endpoints, monitoramento) e `CHANGELOG.md` para o histórico. Este arquivo é o contexto real do projeto; `AGENTS.md` tem as regras genéricas de processo/arquitetura (cohesion, boundaries, validation) — leia os dois, começando por este.
 
 ## 🔴 Regra absoluta: nunca tocar em `src/v2/`
 
@@ -29,7 +29,21 @@ src/
                       # cria UMA instância de AntennaManager, injeta na v2
 ```
 
-**Regra crítica**: existe **uma única conexão TCP física** com cada antena por processo. `AntennaManager` é criado uma vez em `server.ts` e passado por injeção para a camada HTTP (`StartWebServer(antennaInstance)`) — nunca instanciar um segundo `AntennaManager` para a mesma antena, mesmo ao adicionar uma futura v3. v2 e v3 (se vier a existir) devem compartilhar a mesma instância.
+**Regra crítica**: existe **uma única conexão TCP física** com cada antena por processo. `AntennaManager` é criado uma vez em `server.ts` e injetado tanto na v2 (`StartWebServer(antennaInstance)`) quanto na v3 (`StartWebServerV3(antennaInstance)`) — nunca instanciar um segundo `AntennaManager` para a mesma antena.
+
+### `v3/` — organizada por feature, não por camada
+
+```
+v3/
+  health/         health.routes.ts — reflete estado real da antena (isHealthcheckAwaitingResponse)
+  gate/           gate.routes.ts — estado do portão (getter getGateState)
+  cache/          cache.routes.ts — cache de TAGs validadas (getTagValidatorInstance)
+  shared/         response.ts, reply-helpers.ts, service-auth.ts (TAG_SERVICE_TOKEN), tag.schema.ts (usado por gate/ e cache/)
+  openapi.json    spec escrito à mão, não gerado
+  server.ts       bootstrap do Fastify, porta própria (PORT_V3)
+```
+
+Padrão completo (envelope de resposta, autenticação de serviço, convenção de pastas): `docs/PADRAO-RESPOSTA-V3.md` e `AI-Friendly Architecture Specification.md` (raiz do workspace). Ler só quando a tarefa envolver `v3/`.
 
 ## Este processo roda como TAG1 OU TAG2, nunca os dois
 
