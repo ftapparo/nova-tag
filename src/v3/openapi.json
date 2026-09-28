@@ -9,9 +9,25 @@
     {
       "name": "Health",
       "description": "Disponibilidade do serviço e status da conexão com a antena."
+    },
+    {
+      "name": "Gate",
+      "description": "Estado do portão."
+    },
+    {
+      "name": "Cache",
+      "description": "Consulta do cache de TAGs validadas."
     }
   ],
+  "security": [{ "ApiToken": [] }],
   "components": {
+    "securitySchemes": {
+      "ApiToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "Token de acesso à API."
+      }
+    },
     "schemas": {
       "ResponseMeta": {
         "type": "object",
@@ -137,6 +153,86 @@
           "meta": { "$ref": "#/components/schemas/ResponseMeta" }
         },
         "required": ["success", "data", "meta"]
+      },
+      "GateStateData": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": ["closed", "opening", "open", "closing", "unknown"],
+            "example": "closed"
+          }
+        },
+        "required": ["state"]
+      },
+      "GateStateResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "data": { "$ref": "#/components/schemas/GateStateData" },
+          "meta": { "$ref": "#/components/schemas/ResponseMeta" }
+        },
+        "required": ["success", "data", "meta"]
+      },
+      "AccessVerifyData": {
+        "type": "object",
+        "description": "Dados de identificação retornados pela verificação de acesso.",
+        "properties": {
+          "PERMITIDO": { "type": "string" },
+          "SEQPESSOA": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+          "SEQCLASSIFICACAO": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+          "CLASSIFAUTORIZADA": { "type": "string" },
+          "AUTORIZACAOLANC": { "type": "string" },
+          "TIPO": { "type": "string" },
+          "SEQIDACESSO": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+          "QUADRA": { "type": "string" },
+          "LOTE": { "type": "string" },
+          "PANICO": { "type": "string" },
+          "MIDIA": { "type": "string" },
+          "IDENT": { "type": "string" },
+          "SEQVEICULO": { "oneOf": [{ "type": "string" }, { "type": "integer" }] },
+          "NOME": { "type": "string" },
+          "DESCRICAO": { "type": "string" }
+        }
+      },
+      "TagCacheItem": {
+        "type": "object",
+        "properties": {
+          "tag": { "type": "string" },
+          "validatedAt": { "type": "string", "format": "date-time" },
+          "isValid": { "type": "boolean" },
+          "accessId": { "type": "string" },
+          "verifyData": { "$ref": "#/components/schemas/AccessVerifyData" }
+        },
+        "required": ["tag", "validatedAt", "isValid"]
+      },
+      "CacheStats": {
+        "type": "object",
+        "properties": {
+          "positiveSize": { "type": "integer" },
+          "negativeSize": { "type": "integer" },
+          "positiveTimeout": { "type": "integer", "description": "Duração do cache positivo, em milissegundos." },
+          "negativeTimeout": { "type": "integer", "description": "Duração do cache negativo, em milissegundos." }
+        },
+        "required": ["positiveSize", "negativeSize", "positiveTimeout", "negativeTimeout"]
+      },
+      "ListCacheData": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string", "enum": ["positive", "negative", "all"] },
+          "items": { "type": "array", "items": { "$ref": "#/components/schemas/TagCacheItem" } },
+          "stats": { "$ref": "#/components/schemas/CacheStats" }
+        },
+        "required": ["type", "items", "stats"]
+      },
+      "ListCacheResponse": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "data": { "$ref": "#/components/schemas/ListCacheData" },
+          "meta": { "$ref": "#/components/schemas/ResponseMeta" }
+        },
+        "required": ["success", "data", "meta"]
       }
     },
     "responses": {
@@ -162,6 +258,29 @@
             }
           }
         }
+      },
+      "Unauthorized": {
+        "description": "Não autorizado.",
+        "content": {
+          "application/json": {
+            "schema": { "$ref": "#/components/schemas/ErrorResponse" },
+            "example": {
+              "success": false,
+              "error": {
+                "type": "urn:nova-tag:unauthorized",
+                "title": "Autenticação necessária",
+                "status": 401,
+                "detail": "Não autorizado.",
+                "instance": "/v3/api/gate/state"
+              },
+              "meta": {
+                "timestamp": "2026-09-28T03:24:14.989Z",
+                "requestId": "req-3",
+                "version": "v3"
+              }
+            }
+          }
+        }
       }
     }
   },
@@ -172,6 +291,7 @@
         "summary": "Healthcheck do serviço",
         "description": "Verifica disponibilidade da camada HTTP e o estado da conexão TCP com a antena. Retorna 503 quando um healthcheck enviado à antena está pendente de resposta.",
         "operationId": "getHealth",
+        "security": [],
         "responses": {
           "200": {
             "description": "Serviço e antena operando normalmente.",
@@ -216,6 +336,7 @@
         "summary": "Healthcheck do serviço (alias)",
         "description": "Alias de /v3/api/health. Mesmo handler e resposta, mantido por compatibilidade de convenção com a v2.",
         "operationId": "getHealthcheck",
+        "security": [],
         "responses": {
           "200": {
             "description": "Serviço e antena operando normalmente.",
@@ -251,6 +372,63 @@
               }
             }
           }
+        }
+      }
+    },
+    "/v3/api/gate/state": {
+      "get": {
+        "tags": ["Gate"],
+        "summary": "Estado do portão",
+        "description": "Retorna o estado atual do portão controlado por esta antena.",
+        "operationId": "getGateState",
+        "responses": {
+          "200": {
+            "description": "Estado atual.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GateStateResponse" },
+                "example": {
+                  "success": true,
+                  "data": { "state": "closed" },
+                  "meta": {
+                    "timestamp": "2026-09-28T03:44:40.342Z",
+                    "requestId": "req-1",
+                    "version": "v3"
+                  }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/v3/api/cache": {
+      "get": {
+        "tags": ["Cache"],
+        "summary": "Lista o cache de TAGs validadas",
+        "description": "Retorna as entradas do cache de validação de TAGs (positivo, negativo ou ambos) e estatísticas de tamanho e tempo de expiração.",
+        "operationId": "listCache",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "description": "Filtra por tipo de cache. Omitido retorna todos.",
+            "schema": { "type": "string", "enum": ["positive", "negative", "all", "whitelist", "blacklist"], "default": "all" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Entradas do cache.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ListCacheResponse" }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "503": { "description": "Serviço de validação de TAGs indisponível." }
         }
       }
     }

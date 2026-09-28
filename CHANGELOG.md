@@ -4,6 +4,12 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 
 ## [Unreleased]
 
+### Adicionado
+- Esqueleto da v3 (Fastify + Zod) rodando lado a lado com a v2, com endpoints de healthcheck refletindo o estado real da antena.
+- Rotas de leitura migradas para a v3: `GET /v3/api/gate/state` (estado do portão) e `GET /v3/api/cache` (cache de TAGs validadas, com estatísticas). Reaproveitam os mesmos objetos de `core/` que a v2 usa (`AntennaManager`, `TagValidator` via `getTagValidatorInstance`), sem duplicar lógica de negócio.
+- Autenticação de serviço na v3 (`TAG_SERVICE_TOKEN`): todas as rotas protegidas exigem `Authorization: Bearer <token>`, exceto healthcheck e documentação Swagger. Só a `nova-api` (rede interna) deve conhecer esse segredo.
+- Documentação Swagger escrita manualmente em `src/v3/openapi.json` (não gerada a partir dos schemas Zod).
+
 ### Alterado
 - Reorganização estrutural do código: `controllers/`, `routes/`, `middleware/` e `api/` movidos para `src/v2/` (camada Express atual, sem mudança de comportamento). `utils/` movido para dentro de `src/core/`, junto do driver real da antena (`antenna-manager`, `gate-controller`, `tag-validator`), que já vivia em `core/`. Preparação para uma futura v3 (Fastify + Zod, pensada para consumo mobile), que vai compartilhar a mesma instância `AntennaManager` — a conexão TCP com a antena é única e não pode ser duplicada.
 

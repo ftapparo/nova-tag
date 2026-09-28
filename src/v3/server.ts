@@ -5,7 +5,10 @@ import { serializerCompiler, validatorCompiler, type ZodTypeProvider } from 'fas
 import logger from '../core/utils/logger';
 import { AntennaManager } from '../core/antenna-manager';
 import { healthRoutes } from './routes/health.routes';
+import { gateRoutes } from './routes/gate.routes';
+import { cacheRoutes } from './routes/cache.routes';
 import { registerErrorHandler, responseHelpersPlugin } from './lib/reply-helpers';
+import { registerServiceAuth } from './lib/service-auth';
 import openapiDocument from './openapi.json';
 
 /**
@@ -33,6 +36,12 @@ export async function StartWebServerV3(antennaInstance: AntennaManager): Promise
     await app.register(responseHelpersPlugin);
     registerErrorHandler(app);
 
+    // Autenticação de serviço: só a nova-api (rede interna) conhece
+    // TAG_SERVICE_TOKEN e pode chamar estas rotas. Autorização por
+    // usuário/role continua sendo decidida na nova-api antes de repassar
+    // a chamada — ver src/v3/lib/service-auth.ts.
+    registerServiceAuth(app);
+
     // Flag própria da v3 (independente de qualquer flag da v2). Spec
     // escrito à mão em openapi.json, servido em mode: 'static' — mesmo
     // padrão de nova-api (ver docs/PADRAO-RESPOSTA-V3.md).
@@ -55,9 +64,9 @@ export async function StartWebServerV3(antennaInstance: AntennaManager): Promise
     await app.register(async (instance) => {
         instance.withTypeProvider<ZodTypeProvider>();
         await healthRoutes(instance);
+        await gateRoutes(instance, antennaInstance);
+        await cacheRoutes(instance);
     }, { prefix: '/v3/api' });
-
-    void antennaInstance; // reservado para rotas futuras (ex.: reiniciar antena)
 
     const port = Number(process.env.PORT_V3 || 3031);
 
