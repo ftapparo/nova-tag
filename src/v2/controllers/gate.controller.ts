@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { AntennaManager } from '../core/antenna-manager';
+import { AntennaManager } from '../../core/antenna-manager';
 
 /**
  * Obtém o estado atual do portão.

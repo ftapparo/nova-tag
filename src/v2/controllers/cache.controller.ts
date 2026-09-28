@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { getTagValidatorInstance } from '../core/antenna-manager';
+import { getTagValidatorInstance } from '../../core/antenna-manager';
 
 /**
  * Lista entradas do cache de TAGs.

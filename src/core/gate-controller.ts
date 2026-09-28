@@ -1,5 +1,5 @@
 import net from 'net';
-import logger from '../utils/logger';
+import logger from './utils/logger';
 
 /**
  * Enum que representa os estados possíveis do portão

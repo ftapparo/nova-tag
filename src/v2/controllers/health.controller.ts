@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
-import { isHealthcheckAwaitingResponse } from '../core/antenna-manager';
-import { AntennaManager } from '../core/antenna-manager';
+import { isHealthcheckAwaitingResponse } from '../../core/antenna-manager';
+import { AntennaManager } from '../../core/antenna-manager';
 
 /**
  * Realiza o health check da API.

@@ -1,6 +1,6 @@
 import net from 'net';
 import dotenv from 'dotenv';
-import logger from '../utils/logger';
+import logger from './utils/logger';
 import { GateController } from './gate-controller';
 import { TagValidator, AccessVerifyData } from './tag-validator';
 

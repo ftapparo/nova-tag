@@ -7,7 +7,7 @@ import swaggerDocument from '../swagger.json';
 import healthRoutes from '../routes/health.routes';
 import gateRoutes from '../routes/gate.routes';
 import cacheRoutes from '../routes/cache.routes';
-import { AntennaManager } from '../core/antenna-manager';
+import { AntennaManager } from '../../core/antenna-manager';
 import { responseHandler } from '../middleware/response-handler';
 import { requestContextMiddleware } from '../middleware/request-context';
 

@@ -1,6 +1,6 @@
 import express from 'express';
 import { healthCheck, restartAntennaConnection } from '../controllers/health.controller';
-import { AntennaManager } from '../core/antenna-manager';
+import { AntennaManager } from '../../core/antenna-manager';
 
 export default (antennaInstance: AntennaManager) => {
 

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import axios, { AxiosError } from 'axios';
-import logger from '../utils/logger';
+import logger from './utils/logger';
 
 // Carrega variáveis de ambiente do arquivo .env
 dotenv.config();

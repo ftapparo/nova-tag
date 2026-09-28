@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 import axios from 'axios';
-import { StartWebServer } from './api/web-server.api';
+import { StartWebServer } from './v2/api/web-server.api';
 import { AntennaManager, AntennaConfig } from './core/antenna-manager';
 
 // Carrega variáveis de ambiente (.env é opcional em Docker)
