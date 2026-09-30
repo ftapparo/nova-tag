@@ -3,7 +3,7 @@
   "info": {
     "title": "Nova Tag — v3",
     "version": "3.0.0",
-    "description": "API v3 - Controle de Acesso RFID Nova Residence"
+    "description": "API v3 - Controle de Acesso RFID Nova Residence\n\n**WebSocket** `/v3/ws` (mesma porta): exige `Authorization: Bearer <TAG_SERVICE_TOKEN>` no upgrade, máximo TAG_WS_V3_MAX_CLIENTS conexões (padrão 5), ping a cada 30 s. Mensagens `{ event, timestamp, data, meta: { version } }`; eventos `connection.established`, `gate.state.changed` `{ numeroDispositivo, state, keepOpen }`, `antenna.connection.changed` `{ numeroDispositivo, connected }`, `tag.read` `{ numeroDispositivo, tag, authorized, reason, direction }` (sem dados pessoais)."
   },
   "tags": [
     {
@@ -161,9 +161,17 @@
             "type": "string",
             "enum": ["closed", "opening", "open", "closing", "unknown"],
             "example": "closed"
+          },
+          "keepOpen": {
+            "type": "boolean",
+            "description": "true = portão travado aberto, sem fechamento automático.",
+            "example": false
           }
         },
-        "required": ["state"]
+        "required": [
+          "state",
+          "keepOpen"
+        ]
       },
       "GateStateResponse": {
         "type": "object",
@@ -233,6 +241,201 @@
           "meta": { "$ref": "#/components/schemas/ResponseMeta" }
         },
         "required": ["success", "data", "meta"]
+      },
+      "OpenGateBody": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Corpo vazio = fecha sozinho em GATE_AUTO_CLOSE_DEFAULT (15 s). autoCloseTime e keepOpen são exclusivos.",
+        "properties": {
+          "autoCloseTime": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Segundos até o fechamento automático (máximo GATE_AUTO_CLOSE_MAX, padrão 120).",
+            "example": 15
+          },
+          "keepOpen": {
+            "type": "boolean",
+            "enum": [
+              true
+            ],
+            "description": "Mantém o portão aberto até um comando de fechamento."
+          }
+        }
+      },
+      "ConfirmBody": {
+        "type": "object",
+        "properties": {
+          "confirm": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          }
+        },
+        "required": [
+          "confirm"
+        ]
+      },
+      "GateCommandData": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "open",
+              "close"
+            ]
+          },
+          "autoCloseSeconds": {
+            "type": "integer",
+            "nullable": true,
+            "example": 15
+          },
+          "gate": {
+            "$ref": "#/components/schemas/GateStateData"
+          }
+        },
+        "required": [
+          "action",
+          "autoCloseSeconds",
+          "gate"
+        ]
+      },
+      "GateCommandResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/GateCommandData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
+      },
+      "RestartData": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "shutdownDelayMs": {
+            "type": "integer",
+            "example": 2000
+          }
+        },
+        "required": [
+          "message",
+          "shutdownDelayMs"
+        ]
+      },
+      "RestartResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RestartData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
+      },
+      "ClearCacheData": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "positive",
+              "negative",
+              "all"
+            ]
+          },
+          "stats": {
+            "$ref": "#/components/schemas/CacheStats"
+          }
+        },
+        "required": [
+          "type",
+          "stats"
+        ]
+      },
+      "ClearCacheResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/ClearCacheData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
+      },
+      "RemoveCacheItemData": {
+        "type": "object",
+        "properties": {
+          "tag": {
+            "type": "string",
+            "example": "0123456789"
+          }
+        },
+        "required": [
+          "tag"
+        ]
+      },
+      "RemoveCacheItemResponse": {
+        "type": "object",
+        "properties": {
+          "success": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "data": {
+            "$ref": "#/components/schemas/RemoveCacheItemData"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/ResponseMeta"
+          }
+        },
+        "required": [
+          "success",
+          "data",
+          "meta"
+        ]
       }
     },
     "responses": {
@@ -278,6 +481,53 @@
                 "requestId": "req-3",
                 "version": "v3"
               }
+            }
+          }
+        }
+      },
+      "ValidationError": {
+        "description": "Corpo ou parâmetros inválidos.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "Portão não aceitou o comando (em movimento, antena desconectada ou já encerrando). Não repetir automaticamente.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        }
+      },
+      "RateLimited": {
+        "description": "Portão acionado recentemente. Respeite o header Retry-After (segundos).",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
+            }
+          }
+        },
+        "headers": {
+          "Retry-After": {
+            "schema": {
+              "type": "integer"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "TagValidator indisponível.",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/ErrorResponse"
             }
           }
         }
@@ -389,7 +639,10 @@
                 "schema": { "$ref": "#/components/schemas/GateStateResponse" },
                 "example": {
                   "success": true,
-                  "data": { "state": "closed" },
+                  "data": {
+                    "state": "closed",
+                    "keepOpen": false
+                  },
                   "meta": {
                     "timestamp": "2026-09-28T03:44:40.342Z",
                     "requestId": "req-1",
@@ -429,6 +682,206 @@
           },
           "401": { "$ref": "#/components/responses/Unauthorized" },
           "503": { "description": "Serviço de validação de TAGs indisponível." }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Cache"
+        ],
+        "summary": "Limpar cache de TAGs",
+        "description": "Força revalidação na API central. Toda limpeza é registrada em log com o ator.",
+        "operationId": "clearCache",
+        "parameters": [
+          {
+            "name": "type",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "positive",
+                "negative",
+                "all",
+                "whitelist",
+                "blacklist"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Cache limpo.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClearCacheResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/v3/api/gate/open": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Abrir portão",
+        "description": "Aciona o motor físico. Cooldown entre acionamentos (GATE_COOLDOWN_MS, padrão 3 s). O ator repassado pela nova-api em x-actor-id/x-actor-role vai para o log.",
+        "operationId": "openGate",
+        "requestBody": {
+          "required": false,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/OpenGateBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Comando enviado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateCommandResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v3/api/gate/close": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Fechar portão",
+        "description": "Fecha o portão imediatamente. Mesmo cooldown da abertura.",
+        "operationId": "closeGate",
+        "responses": {
+          "200": {
+            "description": "Comando enviado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/GateCommandResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/RateLimited"
+          }
+        }
+      }
+    },
+    "/v3/api/gate/restart": {
+      "post": {
+        "tags": [
+          "Gate"
+        ],
+        "summary": "Reiniciar serviço do portão",
+        "description": "Encerra o processo para o Docker reiniciar o container. Exige { \"confirm\": true }.",
+        "operationId": "restartGate",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfirmBody"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Encerramento agendado.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RestartResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/ValidationError"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          }
+        }
+      }
+    },
+    "/v3/api/cache/{tag}": {
+      "delete": {
+        "tags": [
+          "Cache"
+        ],
+        "summary": "Remover TAG do cache",
+        "operationId": "removeCacheItem",
+        "parameters": [
+          {
+            "name": "tag",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 32
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "TAG removida.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RemoveCacheItemResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
         }
       }
     }

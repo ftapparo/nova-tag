@@ -1,5 +1,6 @@
 import net from 'net';
 import logger from './utils/logger';
+import { tagEvents } from './tag-events';
 
 /**
  * Enum que representa os estados possíveis do portão
@@ -56,6 +57,21 @@ export class GateController {
     }
 
     /**
+     * Indica se o portão está travado aberto (sem fechamento automático).
+     */
+    isKeepOpen(): boolean {
+        return this.keepOpen;
+    }
+
+    private setState(state: GateState) {
+        this.state = state;
+        tagEvents.emitEvent('gate.state.changed', {
+            state: state.toLowerCase() as 'closed' | 'opening' | 'open' | 'closing',
+            keepOpen: this.keepOpen,
+        });
+    }
+
+    /**
      * Envia comando para abrir o portão, inicia timer de fechamento automático e atualiza estado
      * @returns Promise<boolean> true se comando enviado com sucesso
      */
@@ -91,7 +107,7 @@ export class GateController {
         }
         try {
             this.sendCommand(this.relayOpenCmd);
-            this.state = GateState.OPENING;
+            this.setState(GateState.OPENING);
             logger.metric('OPEN_GATE', 1);
             logger.info('[GateController] Portão abrindo', { antennaId: this.antennaId });
 
@@ -105,7 +121,7 @@ export class GateController {
                 logger.info('[GateController] Portão mantido aberto sem fechamento automático', { antennaId: this.antennaId });
             }
 
-            this.state = GateState.OPEN;
+            this.setState(GateState.OPEN);
             return true;
         } catch (error) {
             logger.error('[GateController] Erro ao abrir portão', { error, antennaId: this.antennaId });
@@ -125,14 +141,14 @@ export class GateController {
         try {
             this.keepOpen = false;
             this.sendCommand(this.relayCloseCmd);
-            this.state = GateState.CLOSING;
+            this.setState(GateState.CLOSING);
             logger.metric('CLOSE_GATE', 1);
             logger.info('[GateController] Portão fechando', { antennaId: this.antennaId });
 
 
             // Após comando, considera fechado após 1s (tempo de resposta do relé)
             setTimeout(() => {
-                this.state = GateState.CLOSED;
+                this.setState(GateState.CLOSED);
                 logger.info('[GateController] Portão fechado', { antennaId: this.antennaId });
             }, 1000);
 

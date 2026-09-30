@@ -6,9 +6,12 @@ import logger from '../core/utils/logger';
 import { AntennaManager } from '../core/antenna-manager';
 import { healthRoutes } from './health/health.routes';
 import { gateRoutes } from './gate/gate.routes';
+import { gateCommandRoutes } from './gate/gate.commands.routes';
+import { TagWsBroker } from '../core/ws/tag-ws-broker';
+import { tagEvents, type TagEventName } from '../core/tag-events';
 import { cacheRoutes } from './cache/cache.routes';
 import { registerErrorHandler, responseHelpersPlugin } from './shared/reply-helpers';
-import { registerServiceAuth } from './shared/service-auth';
+import { hasValidServiceToken, registerServiceAuth } from './shared/service-auth';
 import openapiDocument from './openapi.json';
 
 /**
@@ -65,6 +68,7 @@ export async function StartWebServerV3(antennaInstance: AntennaManager): Promise
         instance.withTypeProvider<ZodTypeProvider>();
         await healthRoutes(instance);
         await gateRoutes(instance, antennaInstance);
+        await gateCommandRoutes(instance, antennaInstance);
         await cacheRoutes(instance);
     }, { prefix: '/v3/api' });
 
@@ -73,6 +77,21 @@ export async function StartWebServerV3(antennaInstance: AntennaManager): Promise
     try {
         await app.listen({ port, host: '0.0.0.0' });
         logger.info(`[ApiV3] WebServer (Fastify) rodando na porta ${port}`);
+
+        // Eventos do portão em tempo real, no mesmo servidor HTTP da v3.
+        // Consumidor previsto: só a nova-api pela rede interna — por isso
+        // o token de serviço no upgrade e o limite baixo de conexões.
+        const broker = new TagWsBroker(app.server, '/v3/ws', {
+            authorize: (request) => hasValidServiceToken(request.headers),
+            maxClients: Number(process.env.TAG_WS_V3_MAX_CLIENTS || 5),
+            heartbeatMs: 30000,
+            version: 'v3',
+        });
+        const events: TagEventName[] = ['gate.state.changed', 'antenna.connection.changed', 'tag.read'];
+        events.forEach((event) => {
+            tagEvents.onEvent(event, (data) => broker.publish(event, { numeroDispositivo: antennaInstance.antenna.device, ...data }));
+        });
+        logger.info('[ApiV3] WebSocket disponível em /v3/ws');
     } catch (err) {
         logger.error('[ApiV3] Falha ao iniciar o servidor Fastify:', err);
         throw err;

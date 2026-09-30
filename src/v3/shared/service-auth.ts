@@ -1,3 +1,5 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
+import type { IncomingHttpHeaders } from 'node:http';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 
 // =============================================================================
@@ -13,13 +15,33 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 // mecanismo não substitui isso.
 // =============================================================================
 
-const extractToken = (request: FastifyRequest): string | null => {
-    const header = request.headers.authorization;
+const extractToken = (headers: IncomingHttpHeaders): string | null => {
+    const header = headers.authorization;
     if (typeof header === 'string' && header.startsWith('Bearer ')) {
         return header.slice('Bearer '.length).trim();
     }
     return null;
 };
+
+// Compara os hashes (mesmo tamanho) em tempo constante, para o tempo de
+// resposta não revelar quantos caracteres do token estão certos.
+const tokensMatch = (received: string, expected: string): boolean =>
+    timingSafeEqual(
+        createHash('sha256').update(received).digest(),
+        createHash('sha256').update(expected).digest(),
+    );
+
+/**
+ * Verifica `Authorization: Bearer <TAG_SERVICE_TOKEN>`. Usado pelo hook
+ * HTTP abaixo e pelo upgrade do WebSocket /v3/ws (src/v3/server.ts).
+ * Sem token configurado, recusa tudo.
+ */
+export function hasValidServiceToken(headers: IncomingHttpHeaders): boolean {
+    const expectedToken = process.env.TAG_SERVICE_TOKEN;
+    if (!expectedToken) return false;
+    const token = extractToken(headers);
+    return !!token && tokensMatch(token, expectedToken);
+}
 
 export function registerServiceAuth(app: FastifyInstance) {
     const expectedToken = process.env.TAG_SERVICE_TOKEN;
@@ -48,8 +70,7 @@ export function registerServiceAuth(app: FastifyInstance) {
             });
         }
 
-        const token = extractToken(request);
-        if (!token || token !== expectedToken) {
+        if (!hasValidServiceToken(request.headers)) {
             return reply.fail({
                 type: 'unauthorized',
                 detail: 'Não autorizado.',

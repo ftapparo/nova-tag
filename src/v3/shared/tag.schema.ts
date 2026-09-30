@@ -7,6 +7,8 @@ import { z } from 'zod';
 
 export const gateStateSchema = z.object({
     state: z.enum(['closed', 'opening', 'open', 'closing', 'unknown']),
+    // true = portão travado aberto, sem fechamento automático.
+    keepOpen: z.boolean(),
 });
 
 // AccessVerifyData: dados retornados pela API de verificação de acesso,
@@ -51,3 +53,50 @@ export const listCacheDataSchema = z.object({
 });
 
 export const cacheTypeQuerySchema = z.enum(['positive', 'negative', 'all', 'whitelist', 'blacklist']);
+
+// -----------------------------------------------------------------------------
+// Comandos
+// -----------------------------------------------------------------------------
+
+// Lidos no uso (não no topo do módulo) pelo mesmo motivo de sempre: o
+// import roda antes de dotenv.config().
+export const resolveAutoCloseDefaultSeconds = (): number => {
+    const value = Number(process.env.GATE_AUTO_CLOSE_DEFAULT || '15');
+    return Number.isInteger(value) && value > 0 ? value : 15;
+};
+
+export const resolveAutoCloseMaxSeconds = (): number => {
+    const value = Number(process.env.GATE_AUTO_CLOSE_MAX || '120');
+    return Number.isInteger(value) && value > 0 ? value : 120;
+};
+
+// Na v2, corpo vazio deixava o portão aberto indefinidamente (TAG-C-02).
+// Aqui o padrão é fechar sozinho; ficar aberto exige keepOpen: true.
+// O teto de autoCloseTime é conferido na rota (depende de env).
+export const openGateBodySchema = z.object({
+    autoCloseTime: z.number().int().min(1).optional(),
+    keepOpen: z.literal(true).optional(),
+}).strict().refine((body) => !(body.autoCloseTime !== undefined && body.keepOpen), {
+    message: 'Use autoCloseTime ou keepOpen, não os dois.',
+    path: ['keepOpen'],
+}).optional();
+
+export const confirmBodySchema = z.object({ confirm: z.boolean().optional() }).optional();
+
+export const gateCommandResultSchema = z.object({
+    action: z.enum(['open', 'close']),
+    autoCloseSeconds: z.number().nullable(),
+    gate: gateStateSchema,
+});
+
+export const restartResultSchema = z.object({
+    message: z.string(),
+    shutdownDelayMs: z.number(),
+});
+
+export const clearCacheResultSchema = z.object({
+    type: z.enum(['positive', 'negative', 'all']),
+    stats: cacheStatsSchema,
+});
+
+export const removeCacheItemResultSchema = z.object({ tag: z.string() });

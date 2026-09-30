@@ -5,9 +5,9 @@ import { successResponseSchema } from '../shared/response';
 import { gateStateSchema } from '../shared/tag.schema';
 
 /**
- * Rota de leitura do estado do portão na v3. Reaproveita o getter
- * getGateState da mesma instância de AntennaManager usada pela v2, sem
- * duplicar lógica de negócio.
+ * Rota de leitura do estado do portão na v3. Lê o estado do GateController
+ * (getControllerGateState) na mesma instância de AntennaManager da v2 —
+ * o getter getGateState, que a v2 usa, só enxerga CLOSED.
  */
 export async function gateRoutes(app: FastifyInstance, antennaInstance: AntennaManager) {
     const typedApp = app.withTypeProvider<ZodTypeProvider>();
@@ -15,7 +15,6 @@ export async function gateRoutes(app: FastifyInstance, antennaInstance: AntennaM
     typedApp.get('/gate/state', {
         schema: { response: { 200: successResponseSchema(gateStateSchema) } },
     }, async (_request, reply) => {
-        const state = antennaInstance.getGateState ? antennaInstance.getGateState : 'unknown';
-        reply.ok({ state: state as 'closed' | 'opening' | 'open' | 'closing' | 'unknown' });
+        reply.ok(antennaInstance.getControllerGateState());
     });
 }

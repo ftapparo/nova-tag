@@ -3,6 +3,7 @@ import dotenv from 'dotenv';
 import logger from './utils/logger';
 import { GateController } from './gate-controller';
 import { TagValidator, AccessVerifyData } from './tag-validator';
+import { tagEvents } from './tag-events';
 
 /**
  * Configuração de conexão e operação da antena RFID.
@@ -136,6 +137,7 @@ export class AntennaManager {
 
       this.antennaSocket.setTimeout(HEALTHCHECK_TIMEOUT);
       logger.info(`[CONNECTED] Antena RFID [IP: ${this.antenna.ip}]`);
+      tagEvents.emitEvent('antenna.connection.changed', { connected: true });
       logger.debug(`[HEALTHCHECK] Timeout de conexão ${HEALTHCHECK_TIMEOUT}ms`);
 
       gateController.sendCommandCallback(RELAY_CLOSE_CMD, () => {
@@ -254,6 +256,7 @@ export class AntennaManager {
 
     // Evento de desconexão do socket
     client.on("close", () => {
+      tagEvents.emitEvent('antenna.connection.changed', { connected: false });
 
       if (connectionRetry > ATTEMPT_RECONNECT) {
         logger.issue("[ERROR] Excedido o número de tentativas de reconexão");
@@ -370,6 +373,22 @@ export class AntennaManager {
   }
 
   /**
+   * Estado real do portão, lido do GateController (quem de fato transita
+   * OPENING/OPEN/CLOSING). O getter getGateState acima lê uma variável que
+   * só recebe CLOSED; fica como está porque a v2 o usa.
+   * @returns Estado do portão em minúsculas, ou 'unknown' sem controlador.
+   */
+  public getControllerGateState(): { state: 'closed' | 'opening' | 'open' | 'closing' | 'unknown'; keepOpen: boolean } {
+    if (!gateController) {
+      return { state: 'unknown', keepOpen: false };
+    }
+    return {
+      state: gateController.getState().toLowerCase() as 'closed' | 'opening' | 'open' | 'closing',
+      keepOpen: gateController.isKeepOpen(),
+    };
+  }
+
+  /**
    * Abre o portão, opcionalmente com fechamento automático.
    * @param autoCloseTime Tempo em segundos para fechamento automático.
    * @param options Opções adicionais de abertura.
@@ -415,6 +434,7 @@ export class AntennaManager {
     const cachedVerifyData = this.recentAuthorizedTags.get(tagNumber);
     if (cachedVerifyData !== undefined) {
       this.logTagRead(tagNumber, true, cachedVerifyData);
+      this.emitTagRead(tagNumber, true);
       gateController.openGate();
       return;
     }
@@ -433,6 +453,7 @@ export class AntennaManager {
     const result = await tagValidator.validateTag(tagNumber, accessContext);
     if (result.isValid) {
       this.logTagRead(tagNumber, true, result.verifyData);
+      this.emitTagRead(tagNumber, true);
       logger.counter('AUTHORIZED');
       this.recentAuthorizedTags.set(tagNumber, result.verifyData);
       if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
@@ -445,8 +466,18 @@ export class AntennaManager {
       gateController.openGate();
     } else {
       this.logTagRead(tagNumber, false, result.verifyData, result.reason);
+      this.emitTagRead(tagNumber, false, result.reason);
       logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
     }
+  }
+
+  private emitTagRead(tagNumber: string, authorized: boolean, reason?: string): void {
+    tagEvents.emitEvent('tag.read', {
+      tag: tagNumber,
+      authorized,
+      reason: reason ?? null,
+      direction: this.antenna.direction,
+    });
   }
 
   /**
