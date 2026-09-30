@@ -5,6 +5,7 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 ## [Unreleased]
 
 ### Adicionado
+- Verificação e registro de TAG podem ir para a v3 da `nova-api`: com `API_V3_BASE_URL` definida (ex.: `http://nova-api:3031/v3/api`), `TagValidator` chama `/access/verify` e `/access/register` da v3 autenticado por `API_SERVICE_TOKEN`. Sem a variável, segue na v2 como sempre (padrão). Variáveis listadas no `docker-compose.yml` das duas instâncias.
 - Esqueleto da v3 (Fastify + Zod) rodando lado a lado com a v2, com endpoints de healthcheck refletindo o estado real da antena.
 - Rotas de leitura migradas para a v3: `GET /v3/api/gate/state` (estado do portão) e `GET /v3/api/cache` (cache de TAGs validadas, com estatísticas). Reaproveitam os mesmos objetos de `core/` que a v2 usa (`AntennaManager`, `TagValidator` via `getTagValidatorInstance`), sem duplicar lógica de negócio.
 - Autenticação de serviço na v3 (`TAG_SERVICE_TOKEN`): todas as rotas protegidas exigem `Authorization: Bearer <token>`, exceto healthcheck e documentação Swagger. Só a `nova-api` (rede interna) deve conhecer esse segredo.

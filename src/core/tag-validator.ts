@@ -201,16 +201,43 @@ export class TagValidator {
     }
 
     /**
+     * Destino das chamadas de verificação/registro. Com API_V3_BASE_URL
+     * definida (ex.: http://nova-api:3031/v3/api), usa a v3 da nova-api,
+     * autenticada por API_SERVICE_TOKEN; sem ela, segue na v2 como sempre.
+     * Lido a cada chamada (não no construtor/topo do módulo) para trocar de
+     * superfície só com variável de ambiente + restart, e porque imports
+     * resolvem antes do dotenv.config().
+     */
+    private resolveAccessApi(): { baseUrl: string; deviceParam: 'dispositivo' | 'numeroDispositivo'; headers: Record<string, string> } {
+        const v3BaseUrl = process.env.API_V3_BASE_URL?.trim().replace(/\/+$/, '');
+        const headers: Record<string, string> = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'nova-tag/2.0.0'
+        };
+
+        if (!v3BaseUrl) {
+            return { baseUrl: this.apiBaseUrl, deviceParam: 'dispositivo', headers };
+        }
+
+        return {
+            baseUrl: v3BaseUrl,
+            deviceParam: 'numeroDispositivo',
+            headers: { ...headers, Authorization: `Bearer ${process.env.API_SERVICE_TOKEN ?? ''}` }
+        };
+    }
+
+    /**
      * Valida TAG via API externa
      * @param tag TAG já sanitizada
      * @returns Resultado da validação
      */
     private async validateViaAPI(tag: string, context: AccessContext): Promise<ValidationResult> {
         try {
-            const requestUrl = `${this.apiBaseUrl}/access/verify`;
+            const accessApi = this.resolveAccessApi();
+            const requestUrl = `${accessApi.baseUrl}/access/verify`;
             const params = {
                 id: tag,
-                dispositivo: context.device,
+                [accessApi.deviceParam]: context.device,
                 foto: null,
                 sentido: context.direction
             };
@@ -227,10 +254,7 @@ export class TagValidator {
                 requestUrl,
                 {
                     params,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'nova-tag/2.0.0'
-                    },
+                    headers: accessApi.headers,
                     timeout: this.apiTimeout
                 }
             );
@@ -356,8 +380,9 @@ export class TagValidator {
                 return false;
             }
 
+            const accessApi = this.resolveAccessApi();
             await axios.post(
-                `${this.apiBaseUrl}/access/register`,
+                `${accessApi.baseUrl}/access/register`,
                 {
                     dispositivo: context.device,
                     pessoa: verifyData.SEQPESSOA,
@@ -375,10 +400,7 @@ export class TagValidator {
                     seqVeiculo: verifyData.SEQVEICULO
                 },
                 {
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'User-Agent': 'nova-tag/2.0.0'
-                    },
+                    headers: accessApi.headers,
                     timeout: this.apiTimeout
                 }
             );
