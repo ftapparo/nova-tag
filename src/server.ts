@@ -111,30 +111,40 @@ async function startService(): Promise<void> {
 }
 
 /**
- * Healthcheck da API externa (pré-requisito para subir)
+ * Healthcheck da API externa (pré-requisito para subir).
+ *
+ * Com API_V3_BASE_URL definida, confere a v3 (/v3/api/health) — é ela que
+ * valida e registra as TAGs; sem ela, confere a v2 como antes.
+ *
+ * Espera a API em vez de encerrar: no boot do servidor os containers sobem
+ * em qualquer ordem, e encerrar só gerava um loop de restart do Docker até
+ * a API responder.
  */
 async function checkExternalApiHealth(): Promise<void> {
-    const apiBaseUrl =
-        process.env.API_BASE_URL ??
-        'https://api.condominionovaresidence.com/v2/api';
+    const v3BaseUrl = process.env.API_V3_BASE_URL?.trim().replace(/\/+$/, '');
+    const targets = v3BaseUrl
+        ? [`${v3BaseUrl}/health`]
+        : ['/healthcheck', '/health'].map((endpoint) =>
+            `${process.env.API_BASE_URL ?? 'https://api.condominionovaresidence.com/v2/api'}${endpoint}`);
 
     const timeout = Number(process.env.API_HEALTHCHECK_TIMEOUT) || 5000;
-    const endpoints = ['/healthcheck', '/health'];
+    const retryMs = Number(process.env.API_HEALTHCHECK_RETRY_MS) || 5000;
 
-    console.log('[Server] Verificando API externa...');
+    console.log(`[Server] Verificando API externa (${v3BaseUrl ? 'v3' : 'v2'})...`);
 
-    for (const endpoint of endpoints) {
-        try {
-            await axios.get(`${apiBaseUrl}${endpoint}`, { timeout });
-            console.log(`[Server] API OK: ${endpoint}`);
-            return;
-        } catch (err) {
-            console.warn(`[Server] Falha em ${endpoint}`);
+    for (let attempt = 1; ; attempt += 1) {
+        for (const url of targets) {
+            try {
+                await axios.get(url, { timeout });
+                console.log(`[Server] API OK: ${url}`);
+                return;
+            } catch {
+                console.warn(`[Server] Falha em ${url} (tentativa ${attempt})`);
+            }
         }
+        console.warn(`[Server] API externa indisponível, nova tentativa em ${retryMs} ms`);
+        await new Promise((resolve) => setTimeout(resolve, retryMs));
     }
-
-    console.error('[Server] API externa indisponível. Abortando.');
-    process.exit(1);
 }
 
 // Bootstrap

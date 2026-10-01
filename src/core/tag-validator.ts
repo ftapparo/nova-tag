@@ -222,7 +222,12 @@ export class TagValidator {
         return {
             baseUrl: v3BaseUrl,
             deviceParam: 'numeroDispositivo',
-            headers: { ...headers, Authorization: `Bearer ${process.env.API_SERVICE_TOKEN ?? ''}` }
+            headers: {
+                ...headers,
+                Authorization: `Bearer ${process.env.API_SERVICE_TOKEN ?? ''}`,
+                // Identifica a instância no histórico de comandos da API (servico:tag1).
+                'x-service-name': (process.env.TAG_ID || 'tag').toLowerCase()
+            }
         };
     }
 

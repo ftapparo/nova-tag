@@ -5,6 +5,10 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 ## [Unreleased]
 
 ### Adicionado
+- Chamadas à v3 da `nova-api` enviam `x-service-name` com o `TAG_ID` (`tag1`/`tag2`), para o histórico de comandos mostrar qual instância chamou.
+
+### Alterado
+- Checagem da API na subida: com `API_V3_BASE_URL` definida, confere `/v3/api/health` (antes sempre a v2). E passa a esperar a API, tentando de novo a cada `API_HEALTHCHECK_RETRY_MS` (padrão 5000), em vez de encerrar o processo — no boot do servidor os containers sobem em qualquer ordem e o encerramento só gerava loop de restart.
 - Verificação e registro de TAG podem ir para a v3 da `nova-api`: com `API_V3_BASE_URL` definida (ex.: `http://nova-api:3031/v3/api`), `TagValidator` chama `/access/verify` e `/access/register` da v3 autenticado por `API_SERVICE_TOKEN`. Sem a variável, segue na v2 como sempre (padrão). Variáveis listadas no `docker-compose.yml` das duas instâncias.
 - Esqueleto da v3 (Fastify + Zod) rodando lado a lado com a v2, com endpoints de healthcheck refletindo o estado real da antena.
 - Rotas de leitura migradas para a v3: `GET /v3/api/gate/state` (estado do portão) e `GET /v3/api/cache` (cache de TAGs validadas, com estatísticas). Reaproveitam os mesmos objetos de `core/` que a v2 usa (`AntennaManager`, `TagValidator` via `getTagValidatorInstance`), sem duplicar lógica de negócio.
