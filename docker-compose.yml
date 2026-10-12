@@ -22,6 +22,9 @@ services:
     # ser listada aqui explicitamente para chegar ao processo do container.
     environment:
       - NODE_ENV=production
+      # Fuso de Brasilia: o arquivo de log diario vira a 00:00 local (em UTC
+      # virava as 21:00). O horario das linhas ja e fixado no logger.
+      - TZ=America/Sao_Paulo
       - TAG_ID=TAG1
       - PORT=4000
       - PORT_V3=3031
@@ -86,6 +89,9 @@ services:
     # ser listada aqui explicitamente para chegar ao processo do container.
     environment:
       - NODE_ENV=production
+      # Fuso de Brasilia: o arquivo de log diario vira a 00:00 local (em UTC
+      # virava as 21:00). O horario das linhas ja e fixado no logger.
+      - TZ=America/Sao_Paulo
       - TAG_ID=TAG2
       - PORT=4000
       - PORT_V3=3031
@@ -135,6 +141,9 @@ services:
       - AUTOHEAL_CONTAINER_LABEL=autoheal
       - AUTOHEAL_INTERVAL=10
       - AUTOHEAL_START_PERIOD=40
+      # Brasilia sem depender da base de fusos da imagem (sem horario de
+      # verao desde 2019): o log do autoheal deixa de sair em UTC.
+      - TZ=<-03>3
     volumes:
       - //var/run/docker.sock:/var/run/docker.sock
     networks:
