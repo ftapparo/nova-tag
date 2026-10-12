@@ -67,12 +67,19 @@ export function extractFrames(buffer: Buffer): { frames: AntennaFrame[]; discard
             pending = pending.subarray(head);
         }
 
-        if (pending.length < HEADER_SIZE) {
-            break;
-        }
-        const size = HEADER_SIZE + pending[4] + CRC_SIZE;
+        const size = pending.length >= HEADER_SIZE ? HEADER_SIZE + pending[4] + CRC_SIZE : Infinity;
         if (pending.length < size) {
-            break;
+            // Quadro incompleto: normalmente o resto ainda vai chegar. Mas se já existe
+            // um quadro completo e válido mais adiante, este 0xCF não era início de
+            // quadro (o TCP entrega os bytes em ordem) — esperar por ele prenderia as
+            // leituras seguintes até acumular os bytes de um tamanho que não existe.
+            const next = findValidFrameStart(pending, 1);
+            if (next === -1) {
+                break;
+            }
+            discarded.push(pending.subarray(0, next));
+            pending = pending.subarray(next);
+            continue;
         }
 
         const raw = pending.subarray(0, size);
@@ -94,4 +101,21 @@ export function extractFrames(buffer: Buffer): { frames: AntennaFrame[]; discard
     }
 
     return { frames, discarded, rest: Buffer.from(pending) };
+}
+
+/**
+ * Posição do primeiro quadro completo e com CRC válido a partir de `from`.
+ * @returns Índice do 0xCF que inicia o quadro, ou -1 se não houver.
+ */
+function findValidFrameStart(buffer: Buffer, from: number): number {
+    for (let start = buffer.indexOf(FRAME_HEAD, from); start !== -1; start = buffer.indexOf(FRAME_HEAD, start + 1)) {
+        if (buffer.length - start < HEADER_SIZE) return -1;
+        const size = HEADER_SIZE + buffer[start + 4] + CRC_SIZE;
+        if (buffer.length - start < size) continue;
+        const candidate = buffer.subarray(start, start + size);
+        if (crc16(candidate.subarray(0, size - CRC_SIZE)) === candidate.readUInt16BE(size - CRC_SIZE)) {
+            return start;
+        }
+    }
+    return -1;
 }
