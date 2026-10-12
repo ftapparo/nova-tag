@@ -101,6 +101,7 @@ Manual: [`UHF_Prime_Reader.pdf`](UHF_Prime_Reader.pdf) (*UHF Prime Reader User M
 - **Ciclo** = portão aberto → fechado no software (`GateController`, `onCycleEnd`). A validação na API continua na primeira leitura (decide se abre); a **gravação no ERP acontece no fim do ciclo**, uma por TAG autorizada, com `dataHora` da primeira leitura (campo da v3 da nova-api), sem regravar a mesma TAG em 2 min.
 - **Intrusa** = TAG em dois ciclos seguidos com 60 s–5 min entre as aparições (calibrado com uma semana real: com menos de 60 s, a mesma passagem dividida em dois ciclos marcava carros normais). Marcada em memória até reiniciar, por decisão do usuário (vaga fixa). Com outro veículo no ciclo é ignorada; só intrusas no laço (uma ou mais, contadas juntas para duas não travarem a saída), libera na 3ª leitura seguida (`INTRUDER_CONFIRMATIONS`; 5 reduziria ainda mais as aberturas falsas, com ~4 s de espera para o dono). `INTRUDER_DETECTION=false` desliga.
 - **Fila**: TAG nova autorizada com o ciclo aberto reenvia o comando de abrir (o motor fecha após cada passagem).
+- **"Manter aberto"** (porteiro, veículo sem TAG): uma TAG autorizada lida o cancela (`openGate` com `fromTag`) e o portão fecha 3 s após a última leitura, como na abertura com tempo.
 
 ### Recuperação da antena (não reintroduzir reconexão insistente)
 

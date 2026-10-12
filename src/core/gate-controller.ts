@@ -85,11 +85,17 @@ export class GateController {
      * Envia comando para abrir o portão, inicia timer de fechamento automático e atualiza estado
      * @returns Promise<boolean> true se comando enviado com sucesso
      */
-    async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean; forcePulse?: boolean }): Promise<boolean> {
+    async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean; forcePulse?: boolean; fromTag?: boolean }): Promise<boolean> {
         if (options?.keepOpen === true) {
             this.keepOpen = true;
         } else if (options?.keepOpen === false) {
             this.keepOpen = false;
+        } else if (options?.fromTag && this.keepOpen) {
+            // "Manter aberto" serve para um veículo sem TAG (prestador). Uma TAG
+            // autorizada passando encerra esse uso: o portão volta a fechar após
+            // a última leitura, como já acontece com a abertura com tempo.
+            this.keepOpen = false;
+            logger.info('[GateController] TAG lida: manter aberto cancelado, fecha após a passagem', { antennaId: this.antennaId });
         }
 
         if (this.state === GateState.OPEN) {

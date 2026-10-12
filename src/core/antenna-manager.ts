@@ -688,7 +688,7 @@ export class AntennaManager {
   private async openGateForTag(tagNumber: string): Promise<void> {
     const wasClosed = gateController.getState() === ControllerGateState.CLOSED;
     const forcePulse = !wasClosed && this.tracker.claimControl(tagNumber);
-    const opened = await gateController.openGate(undefined, forcePulse ? { forcePulse: true } : undefined);
+    const opened = await gateController.openGate(undefined, { fromTag: true, forcePulse });
     if (wasClosed && opened) {
       this.tracker.startCycle(Date.now(), tagNumber);
     }
