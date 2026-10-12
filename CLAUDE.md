@@ -88,7 +88,8 @@ Sem suíte de testes automatizados — validação é manual, sempre com a anten
 Manual: [`UHF_Prime_Reader.pdf`](UHF_Prime_Reader.pdf) (*UHF Prime Reader User Manual V1.0*, raiz do repositório). Quadro: `CF | ADDR | CMD (2) | LEN | STATUS + Data | CRC16` — separado e validado em `core/antenna-protocol.ts`, nunca por prefixo de texto.
 
 - `0x0050` RFM_MODULE_INT: healthcheck (verificação de antena online, resposta mais curta).
-- `0x0077` relé: opção `0x02` aciona por ValidTime (10 s, o hardware solta sozinho); `0x01` solta.
+- `0x0077` relé: opção `0x02` aciona por ValidTime (10 s, o hardware solta sozinho — confirmado em campo); `0x01` solta.
+- **O relé comanda o semáforo, não segura o portão.** O comando de abrir dá o pulso no motor (ciclo de abertura ~3 s); o motor fica aberto por 30 s pelo próprio temporizador e fecha logo após o veículo passar pelo sensor. Semáforo: verde a partir da leitura, vermelho `GATE_TIMEOUT_TO_CLOSE` (3 s, decisão do usuário — 2 s soltava o relé com o carro parado entre leituras) após a última leitura; com o carro parado na antena, o comando de abrir é renovado a cada 7 s para o verde não cair no 10º segundo. Não estender o verde depois que as leituras param: o portão já está fechando.
 - `0x0076` máscara (fora do manual V1.0; leitura `CFFF00760102AB1B`, mesma configuração do 0x0073 em formato estendido). A antena **ignora dados de máscara todos zero** — o `FILTER_DATA` atual só garante máscara ligada, início 0 e 4 bytes; os dados valendo (`FF FF FF FF`, gravados pelo configurador) barram as TAGs de pedágio. Decisão do usuário: manter o `FILTER_DATA` como está.
 - 🔴 **Nunca enviar `0x0052` (RFM_REBOOT)**: restaura a configuração de fábrica (IP, porta, modo, máscara). Não existe comando de reinício; reiniciar a antena só pela energia.
 - A antena aceita mais de uma conexão TCP ao mesmo tempo (o configurador pode ficar conectado junto com o serviço).

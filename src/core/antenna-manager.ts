@@ -49,6 +49,9 @@ const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
 // RFM_RELEASE_CLOSE_RELAY (0x0077), opção 0x02 "close": aciona o relé por ValidTime = 10 s;
 // depois o próprio hardware solta o relé, mesmo se a conexão cair.
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
+// Com a TAG ainda sendo lida, o comando de abrir é reenviado 7 s após o último envio,
+// 3 s antes de o relé soltar sozinho (o relé comanda o semáforo).
+const RELAY_RENEW_AFTER_MS = 7000;
 // RFM_RELEASE_CLOSE_RELAY (0x0077), opção 0x01 "release": solta o relé.
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 // Máscara de leitura (0x0076, fora do manual V1.0; leitura com CFFF00760102AB1B). A antena
@@ -136,6 +139,7 @@ export class AntennaManager {
       openDurationMs: Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000,
       antennaId: this.antenna.id,
       onCommandSent: () => this.expectResponse(client),
+      relayRenewAfterMs: RELAY_RENEW_AFTER_MS,
     });
     tagValidator = new TagValidator();
 

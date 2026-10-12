@@ -22,6 +22,7 @@ export interface GateControllerOptions {
     openDurationMs?: number; // Tempo de portão aberto (ms)
     antennaId: number; // Identificador da antena
     onCommandSent?: () => void; // Chamado a cada comando escrito no socket (a antena deve responder)
+    relayRenewAfterMs?: number; // Com o portão aberto, reenvia o comando de abrir após esse tempo do último envio
 }
 
 /**
@@ -36,6 +37,8 @@ export class GateController {
     private readonly openDurationMs: number;
     private readonly antennaId: number;
     private readonly onCommandSent?: () => void;
+    private readonly relayRenewAfterMs?: number;
+    private lastOpenCommandAt = 0;
     private keepOpen: boolean = false;
 
     /**
@@ -49,6 +52,7 @@ export class GateController {
         this.openDurationMs = options.openDurationMs || 8000;
         this.antennaId = options.antennaId;
         this.onCommandSent = options.onCommandSent;
+        this.relayRenewAfterMs = options.relayRenewAfterMs;
     }
 
 
@@ -91,6 +95,20 @@ export class GateController {
                 this.openTimer = null;
             }
 
+            // O relé (que comanda o semáforo) solta sozinho 10 s após o comando de abrir.
+            // Com a TAG ainda sendo lida — carro parado na antena —, renova antes disso,
+            // para o semáforo não ficar vermelho com o carro na frente do portão aberto.
+            if (this.relayRenewAfterMs !== undefined && Date.now() - this.lastOpenCommandAt >= this.relayRenewAfterMs) {
+                try {
+                    this.sendCommand(this.relayOpenCmd);
+                    this.lastOpenCommandAt = Date.now();
+                    logger.debug('[GateController] Relé renovado', { antennaId: this.antennaId });
+                } catch (error) {
+                    logger.error('[GateController] Erro ao renovar relé', { error, antennaId: this.antennaId });
+                    return false;
+                }
+            }
+
             if (!this.keepOpen) {
                 this.openTimer = setTimeout(() => {
                     // Comentário: fechamento automático após tempo configurado
@@ -110,6 +128,7 @@ export class GateController {
         }
         try {
             this.sendCommand(this.relayOpenCmd);
+            this.lastOpenCommandAt = Date.now();
             this.setState(GateState.OPENING);
             logger.metric('OPEN_GATE', 1);
             logger.info('[GateController] Portão abrindo', { antennaId: this.antennaId });
