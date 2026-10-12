@@ -85,7 +85,7 @@ Sem suíte de testes automatizados — validação é manual, sempre com a anten
 
 ### Protocolo da antena (UHF Prime Reader)
 
-Manual: *UHF Prime Reader User Manual V1.0* (pedir ao usuário; não está versionado). Quadro: `CF | ADDR | CMD (2) | LEN | STATUS + Data | CRC16` — separado e validado em `core/antenna-protocol.ts`, nunca por prefixo de texto.
+Manual: [`UHF_Prime_Reader.pdf`](UHF_Prime_Reader.pdf) (*UHF Prime Reader User Manual V1.0*, raiz do repositório). Quadro: `CF | ADDR | CMD (2) | LEN | STATUS + Data | CRC16` — separado e validado em `core/antenna-protocol.ts`, nunca por prefixo de texto.
 
 - `0x0050` RFM_MODULE_INT: healthcheck (verificação de antena online, resposta mais curta).
 - `0x0077` relé: opção `0x02` aciona por ValidTime (10 s, o hardware solta sozinho); `0x01` solta.
