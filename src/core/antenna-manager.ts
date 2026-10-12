@@ -378,16 +378,21 @@ export class AntennaManager {
         }
         return;
 
-      // Resposta do relé: Data[0] é a opção do comando (0x01 soltou, 0x02 acionou)
+      // Resposta do relé, identificada pelo tamanho como no parser anterior: soltar volta
+      // 1 byte de dados (opção 0x01) e acionar volta 2. O conteúdo da resposta de acionar
+      // não segue o manual (o byte de opção não é 0x02): identificá-la por ele fazia a
+      // confirmação ser descartada sem log (1 de 274 aberturas em 12/10/2026).
       case AntennaCmd.RELAY:
         if (frame.status !== 0) {
           logger.error(`[ERROR] Antena recusou comando do relé (status ${frame.status}): ${frame.raw.toString('hex')}`);
-        } else if (frame.data[0] === 0x01) {
+        } else if (frame.data.length === 1 && frame.data[0] === 0x01) {
           logger.debug(`[STATE] Portão fechado`);
           logger.counter("CLOSE_GATE");   // Incrementa o contador de abertura de portão
           gateState = GateState.CLOSED;
-        } else if (frame.data[0] === 0x02) {
+        } else if (frame.data.length === 2) {
           logger.debug(`[STATE] Portão aberto`);
+        } else {
+          logger.debug(`[UNKNOWN] Resposta do relé não reconhecida: ${frame.raw.toString('hex')}`);
         }
         return;
 
