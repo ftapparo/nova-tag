@@ -34,7 +34,7 @@ services:
       - CONNECT_TIMEOUT_MS=${CONNECT_TIMEOUT_MS}
       - HEALTHCHECK_GUARD_MS=${HEALTHCHECK_GUARD_MS}
       - GATE_TIMEOUT_TO_CLOSE=${GATE_TIMEOUT_TO_CLOSE}
-      - ATTEMPT_RECONNECT=${ATTEMPT_RECONNECT}
+      - COMMAND_RESPONSE_TIMEOUT_MS=${COMMAND_RESPONSE_TIMEOUT_MS:-5000}
       - SHUTDOWN_DELAY_MS=${SHUTDOWN_DELAY_MS}
       - GATE_AUTO_CLOSE_DEFAULT=${GATE_AUTO_CLOSE_DEFAULT:-15}
       - GATE_AUTO_CLOSE_MAX=${GATE_AUTO_CLOSE_MAX:-120}
@@ -47,11 +47,14 @@ services:
       - C:/Servidor/docker/logs:/app/logs
     networks:
       - nova-network
+    # Intervalo curto: quando a antena nao responde nem apos a reconexao, o
+    # processo sinaliza falha aqui e o autoheal faz stop/start do container.
+    # Quanto antes o Docker marcar "unhealthy", antes o portao volta.
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:4000/v2/api/healthcheck || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 2
       start_period: 40s
     logging:
       driver: "json-file"
@@ -94,7 +97,7 @@ services:
       - CONNECT_TIMEOUT_MS=${CONNECT_TIMEOUT_MS}
       - HEALTHCHECK_GUARD_MS=${HEALTHCHECK_GUARD_MS}
       - GATE_TIMEOUT_TO_CLOSE=${GATE_TIMEOUT_TO_CLOSE}
-      - ATTEMPT_RECONNECT=${ATTEMPT_RECONNECT}
+      - COMMAND_RESPONSE_TIMEOUT_MS=${COMMAND_RESPONSE_TIMEOUT_MS:-5000}
       - SHUTDOWN_DELAY_MS=${SHUTDOWN_DELAY_MS}
       - GATE_AUTO_CLOSE_DEFAULT=${GATE_AUTO_CLOSE_DEFAULT:-15}
       - GATE_AUTO_CLOSE_MAX=${GATE_AUTO_CLOSE_MAX:-120}
@@ -107,11 +110,14 @@ services:
       - C:/Servidor/docker/logs:/app/logs
     networks:
       - nova-network
+    # Intervalo curto: quando a antena nao responde nem apos a reconexao, o
+    # processo sinaliza falha aqui e o autoheal faz stop/start do container.
+    # Quanto antes o Docker marcar "unhealthy", antes o portao volta.
     healthcheck:
       test: ["CMD-SHELL", "wget --quiet --tries=1 --spider http://localhost:4000/v2/api/healthcheck || exit 1"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      interval: 10s
+      timeout: 5s
+      retries: 2
       start_period: 40s
     logging:
       driver: "json-file"

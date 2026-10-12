@@ -21,6 +21,7 @@ export interface GateControllerOptions {
     socket: net.Socket; // Socket TCP conectado à antena
     openDurationMs?: number; // Tempo de portão aberto (ms)
     antennaId: number; // Identificador da antena
+    onCommandSent?: () => void; // Chamado a cada comando escrito no socket (a antena deve responder)
 }
 
 /**
@@ -34,6 +35,7 @@ export class GateController {
     private readonly socket: net.Socket;
     private readonly openDurationMs: number;
     private readonly antennaId: number;
+    private readonly onCommandSent?: () => void;
     private keepOpen: boolean = false;
 
     /**
@@ -46,6 +48,7 @@ export class GateController {
         this.socket = options.socket;
         this.openDurationMs = options.openDurationMs || 8000;
         this.antennaId = options.antennaId;
+        this.onCommandSent = options.onCommandSent;
     }
 
 
@@ -164,6 +167,21 @@ export class GateController {
     }
 
     /**
+     * Desliga o controlador quando o socket dele cai. Sem isso o temporizador de
+     * fechamento disparava depois sobre o socket morto ("Socket não conectado"),
+     * e o estado OPEN fazia novas aberturas responderem sucesso sem enviar nada
+     * até a reconexão. O relé é fechado de novo no sincronismo da reconexão.
+     */
+    dispose() {
+        if (this.openTimer) {
+            clearTimeout(this.openTimer);
+            this.openTimer = null;
+        }
+        this.keepOpen = false;
+        this.state = GateState.CLOSED;
+    }
+
+    /**
      * Envia comando TCP para a antena
      * @param cmd Buffer com comando a ser enviado
      */
@@ -173,6 +191,7 @@ export class GateController {
             throw new Error('Socket não conectado');
         }
         this.socket.write(cmd);
+        this.onCommandSent?.();
     }
 
     /**
@@ -193,5 +212,6 @@ export class GateController {
                 onSuccess?.();
             }
         });
+        this.onCommandSent?.();
     }
 }

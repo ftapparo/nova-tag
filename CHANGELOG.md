@@ -4,10 +4,19 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 
 ## [Unreleased]
 
+### Corrigido
+- Processo sem antena e sem reconectar: quando uma reconexão falhava (timeout ao conectar), o evento `close` encontrava a reconexão marcada como "em andamento" e não agendava mais nada; o processo seguia vivo sem antena até o autoheal reiniciar o container (crise de 10/10/2026 na TAG1). A reconexão passa a ser decidida só pelo socket atual, com um único agendamento.
+- Timeout de conexão disparava também o handler de inatividade, que podia tentar enviar healthcheck num socket destruído e derrubar o processo por exceção.
+- O temporizador de 3 s do healthcheck podia derrubar uma reconexão mais nova; agora derruba só o socket que enviou o healthcheck.
+- Erros do socket da antena (`ECONNREFUSED`, `ECONNRESET`…) nunca eram registrados: o Node marca o socket como destruído antes de emitir `error`, e o log dependia do contrário.
+- Controlador do portão de uma conexão que caiu seguia ativo: o temporizador de fechamento disparava sobre o socket morto ("Socket não conectado ao fechar portão") e, até a reconexão, aberturas respondiam sucesso sem enviar nada. Novo `GateController.dispose()`, chamado na queda.
+
 ### Adicionado
 - Chamadas à v3 da `nova-api` enviam `x-service-name` com o `TAG_ID` (`tag1`/`tag2`), para o histórico de comandos mostrar qual instância chamou.
 
 ### Alterado
+- Recuperação da antena muda: depois de qualquer comando enviado (abrir, fechar, sincronismo, máscara, healthcheck), sem nenhum byte em `COMMAND_RESPONSE_TIMEOUT_MS` (padrão 5000) a conexão é derrubada — vale qualquer byte, não só a confirmação do comando. Após uma queda há **uma** reconexão; se ela também não recebe nada, o processo para de conectar e o health (v2 e v3) responde 503 para o autoheal fazer stop/start do container, que é o que historicamente recupera a antena (reconectar em sequência e o reinício do processo pelo Docker não recuperavam). Sem reinício em 60 s, o processo encerra. Removidos `ATTEMPT_RECONNECT` e o encerramento por número de tentativas.
+- Healthcheck do Docker nas duas instâncias: `interval` 10 s, `timeout` 5 s, `retries` 2 (antes 30 s / 10 s / 3), para o container ser marcado `unhealthy` em ~10–20 s.
 - Checagem da API na subida: com `API_V3_BASE_URL` definida, confere `/v3/api/health` (antes sempre a v2). E passa a esperar a API, tentando de novo a cada `API_HEALTHCHECK_RETRY_MS` (padrão 5000), em vez de encerrar o processo — no boot do servidor os containers sobem em qualquer ordem e o encerramento só gerava loop de restart.
 - Verificação e registro de TAG podem ir para a v3 da `nova-api`: com `API_V3_BASE_URL` definida (ex.: `http://nova-api:3031/v3/api`), `TagValidator` chama `/access/verify` e `/access/register` da v3 autenticado por `API_SERVICE_TOKEN`. Sem a variável, segue na v2 como sempre (padrão). Variáveis listadas no `docker-compose.yml` das duas instâncias.
 - Esqueleto da v3 (Fastify + Zod) rodando lado a lado com a v2, com endpoints de healthcheck refletindo o estado real da antena.

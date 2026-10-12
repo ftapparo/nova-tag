@@ -37,7 +37,6 @@ dotenv.config();
 const HEALTHCHECK_TIMEOUT = Number(process.env.HEALTHCHECK_TIMEOUT) || 30000;
 const HEALTHCHECK_GUARD_MS = Number(process.env.HEALTHCHECK_GUARD_MS) || 500;
 const HEALTHCHECK_ENABLED = process.env.HEALTHCHECK_ENABLED !== 'false';
-const ATTEMPT_RECONNECT = Number(process.env.ATTEMPT_RECONNECT) || 3;
 const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS) || 10000;
 const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
 const RECENT_AUTHORIZED_LIMIT = Number(process.env.RECENT_AUTHORIZED_LIMIT) || 3;
@@ -51,19 +50,32 @@ let healthCheckWaitResponse = false;
 let lastDataTimestamp: number = 0;
 let gateState: GateState = GateState.CLOSED;
 let closeGateTimeout: NodeJS.Timeout | null = null;
-let isReconnecting = false;
+let reconnectTimer: NodeJS.Timeout | null = null;
+let responseTimer: NodeJS.Timeout | null = null;
+let unrecoverableExitTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
-let connectionRetry = 0;
+let receivedSinceConnect = false;    // a conexão atual já recebeu algum byte da antena
+let isRetryConnection = false;       // a conexão atual é a reconexão única após uma queda
+let antennaUnrecoverable = false;    // a reconexão também não recebeu nada: aguarda o reinício do container
+
+const RECONNECT_DELAY_MS = 3000;
+const UNRECOVERABLE_EXIT_MS = 60000;
+
+// Lida no uso, não no topo: imports resolvem antes do dotenv.config() do server.
+const resolveCommandResponseTimeoutMs = (): number => Number(process.env.COMMAND_RESPONSE_TIMEOUT_MS) || 5000;
 
 // Variáveis globais para instâncias de GateController e TagValidator
 let gateController: GateController;
 let tagValidator: TagValidator | null = null;
 
 /**
- * Indica se o último healthcheck da antena ainda aguarda resposta.
- * @returns `true` quando há healthcheck pendente.
+ * Indica se o health deve responder 503: healthcheck da antena pendente, ou
+ * antena sem resposta mesmo após a reconexão. No segundo caso o 503 leva o
+ * autoheal a fazer stop/start do container — o mesmo stop/start manual no
+ * Portainer que historicamente recupera a antena quando reconectar não basta.
+ * @returns `true` quando o health deve sinalizar falha.
  */
-export const isHealthcheckAwaitingResponse = (): boolean => healthCheckWaitResponse;
+export const isHealthcheckAwaitingResponse = (): boolean => healthCheckWaitResponse || antennaUnrecoverable;
 
 /**
  * Retorna a instância atual do TagValidator, se disponível.
@@ -95,8 +107,14 @@ export class AntennaManager {
    * @returns void.
    */
   public connectToAntenna() {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
     const client = new net.Socket();
     this.antennaSocket = client;
+    receivedSinceConnect = false;
 
     // Reatribui instâncias globais se necessário
     gateController = new GateController({
@@ -104,7 +122,8 @@ export class AntennaManager {
       relayCloseCmd: RELAY_CLOSE_CMD,
       socket: client,
       openDurationMs: Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000,
-      antennaId: this.antenna.id
+      antennaId: this.antenna.id,
+      onCommandSent: () => this.expectResponse(client),
     });
     tagValidator = new TagValidator();
 
@@ -126,7 +145,6 @@ export class AntennaManager {
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
       lastDataTimestamp = 0;            //reseta o timestamp do último dado recebido
       gateState = GateState.CLOSED;     //estado do portão fechado
-      isReconnecting = false;           //indica que não está reconectando
 
       if (closeGateTimeout) {
         clearTimeout(closeGateTimeout);
@@ -155,7 +173,11 @@ export class AntennaManager {
     client.on("data", async (data) => {
 
       const hexData = data.toString("hex");   // Converte os dados recebidos para hexadecimal
-      connectionRetry = 0;                    // Reseta o contador de tentativas de conexão
+      receivedSinceConnect = true;            // A antena respondeu nesta conexão
+      if (responseTimer) {                    // Qualquer byte atende o comando que aguardava resposta
+        clearTimeout(responseTimer);
+        responseTimer = null;
+      }
       healthCheckWaitResponse = false;        // Reseta o estado de espera por resposta do healthcheck
       lastDataTimestamp = Date.now();         // Registra o momento do último dado recebido
 
@@ -214,6 +236,13 @@ export class AntennaManager {
     // Evento de inatividade (timeout) no socket
     client.on("timeout", () => {
 
+      // O timeout de conexão (CONNECT_TIMEOUT_MS) dispara este mesmo evento depois
+      // de destruir o socket; enviar healthcheck nele lançaria exceção e derrubaria
+      // o processo. Socket substituído também não tem mais o que verificar.
+      if (client.destroyed || client !== this.antennaSocket) {
+        return;
+      }
+
       // Guard: se um dado foi recebido recentemente, o timeout disparou concorrente com uma
       // transmissão da antena. Enviar healthcheck agora travaria o firmware. O timer de
       // inatividade vai resetar sozinho quando o evento data pendente for processado.
@@ -246,9 +275,10 @@ export class AntennaManager {
 
         // Timeout adicional para aguardar resposta do healthcheck
         setTimeout(() => {
-          if (healthCheckWaitResponse) {
+          // Só derruba o socket que enviou o healthcheck, nunca uma reconexão posterior.
+          if (healthCheckWaitResponse && client === this.antennaSocket) {
             logger.issue(`[ERROR] A dispositivo excedeu o tempo de resposta`);
-            setImmediate(() => this.antennaSocket.destroy());
+            setImmediate(() => client.destroy());
           }
         }, 3000);
       });
@@ -256,35 +286,103 @@ export class AntennaManager {
 
     // Evento de desconexão do socket
     client.on("close", () => {
+      // Só o socket atual decide a reconexão. Antes, uma conexão que falhava
+      // (timeout ao conectar) chegava aqui com a reconexão marcada como "em
+      // andamento" e nada mais era agendado: o processo ficava vivo sem antena
+      // até o autoheal reiniciar o container (crise de 10/10/2026).
+      if (client !== this.antennaSocket || isShuttingDown) {
+        return;
+      }
+
       tagEvents.emitEvent('antenna.connection.changed', { connected: false });
+      gateController.dispose();
+      healthCheckWaitResponse = false;
 
-      if (connectionRetry > ATTEMPT_RECONNECT) {
-        logger.issue("[ERROR] Excedido o número de tentativas de reconexão");
-        // Encerrar a aplicação
-        process.exit(1);
+      if (responseTimer) {
+        clearTimeout(responseTimer);
+        responseTimer = null;
       }
 
-      if (!isReconnecting) {
-        logger.warn(`[DISCONNECTED] Antena [${this.antenna.ip}]. Tentando reconectar...`);
-        isReconnecting = true;
-
-        if (closeGateTimeout) {
-          clearTimeout(closeGateTimeout);
-          closeGateTimeout = null;
-        }
-
-        connectionRetry++;
-        setTimeout(() => { this.connectToAntenna() }, 3000);
+      if (closeGateTimeout) {
+        clearTimeout(closeGateTimeout);
+        closeGateTimeout = null;
       }
+
+      // Uma reconexão recupera a antena que reiniciou (pico de energia). Quando nem
+      // ela recebe resposta, insistir não adianta: na crise de 10/10/2026 a antena
+      // seguiu muda em reconexões a cada poucos segundos, inclusive após o processo
+      // reiniciar sozinho, e só voltou com stop/start do container.
+      if (!receivedSinceConnect && isRetryConnection) {
+        this.markUnrecoverable();
+        return;
+      }
+
+      logger.warn(`[DISCONNECTED] Antena [${this.antenna.ip}]. Tentando reconectar...`);
+      this.scheduleReconnect(RECONNECT_DELAY_MS, true);
     });
 
-    // Evento de erro no socket
+    // Evento de erro no socket. O Node já marca o socket como destruído antes de
+    // emitir "error", então o log não pode depender de `destroyed`.
     client.on("error", (err) => {
-      if (!this.antennaSocket.destroyed) {
-        logger.issue(`[ERROR] Antena [${this.antenna.ip}]: ${err.message}`);
-        this.antennaSocket.destroy();
-      }
+      logger.issue(`[ERROR] Antena [${this.antenna.ip}]: ${err.message}`);
+      client.destroy();
     });
+  }
+
+  /**
+   * Agenda uma nova conexão com a antena, substituindo um agendamento anterior.
+   * @param delayMs Espera antes de conectar.
+   * @param isRetry Se é a reconexão única após uma queda.
+   * @returns void.
+   */
+  private scheduleReconnect(delayMs: number, isRetry: boolean) {
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+    }
+    reconnectTimer = setTimeout(() => {
+      reconnectTimer = null;
+      isRetryConnection = isRetry;
+      this.connectToAntenna();
+    }, delayMs);
+  }
+
+  /**
+   * Aguarda resposta da antena a um comando: sem nenhum byte no prazo, a antena
+   * está muda e a conexão é derrubada. Vale qualquer byte, não só a confirmação
+   * do comando, para não depender de como as mensagens chegam agrupadas no TCP.
+   * @param client Socket pelo qual o comando foi enviado.
+   * @returns void.
+   */
+  private expectResponse(client: net.Socket) {
+    // Já existe comando aguardando: o primeiro byte que chegar atende os dois.
+    if (responseTimer) {
+      return;
+    }
+
+    const timeoutMs = resolveCommandResponseTimeoutMs();
+    responseTimer = setTimeout(() => {
+      responseTimer = null;
+      if (client === this.antennaSocket && !client.destroyed) {
+        logger.issue(`[ERROR] Antena [${this.antenna.ip}] sem resposta ${timeoutMs}ms após comando. Reiniciando conexão`);
+        client.destroy();
+      }
+    }, timeoutMs);
+  }
+
+  /**
+   * Para de conectar e sinaliza falha no health para o autoheal fazer stop/start
+   * do container. Se o reinício não vier (autoheal fora do ar), encerra o processo
+   * para o Docker subir de novo em vez de ficar parado sem antena.
+   * @returns void.
+   */
+  private markUnrecoverable() {
+    antennaUnrecoverable = true;
+    logger.issue(`[ERROR] Antena [${this.antenna.ip}] sem resposta após reconexão. Health sinalizando falha para reinício do container`);
+
+    unrecoverableExitTimer = setTimeout(() => {
+      logger.issue(`[ERROR] Container não reiniciado em ${UNRECOVERABLE_EXIT_MS}ms. Encerrando processo`);
+      process.exit(1);
+    }, UNRECOVERABLE_EXIT_MS);
   }
 
   /**
@@ -297,8 +395,11 @@ export class AntennaManager {
       logger.issue("[SHUTDOWN] Encerrando aplicação...");
 
       healthCheckWaitResponse = false;
-      isReconnecting = true;
-      connectionRetry = 0;
+
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
 
       if (this.antennaSocket && !this.antennaSocket.destroyed) {
         this.antennaSocket.end();
@@ -326,25 +427,22 @@ export class AntennaManager {
    */
   public async restartConnection(): Promise<boolean> {
     try {
+      healthCheckWaitResponse = false;
+      antennaUnrecoverable = false;
+      isRetryConnection = false;
+      if (unrecoverableExitTimer) {
+        clearTimeout(unrecoverableExitTimer);
+        unrecoverableExitTimer = null;
+      }
+
+      // Com o socket aberto, o próprio evento "close" agenda a reconexão.
       if (this.antennaSocket && !this.antennaSocket.destroyed) {
         logger.warn(`[RESTART] Reiniciando conexão da antena [${this.antenna.ip}]`);
         this.antennaSocket.destroy();
       } else {
         logger.warn(`[RESTART] Socket já estava encerrado para antena [${this.antenna.ip}]`);
+        this.scheduleReconnect(300, false);
       }
-
-      if (closeGateTimeout) {
-        clearTimeout(closeGateTimeout);
-        closeGateTimeout = null;
-      }
-
-      healthCheckWaitResponse = false;
-      isReconnecting = false;
-      connectionRetry = 0;
-
-      setTimeout(() => {
-        this.connectToAntenna();
-      }, 300);
 
       return true;
     } catch (error) {

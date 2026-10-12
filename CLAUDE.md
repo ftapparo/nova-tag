@@ -81,6 +81,12 @@ Sem suíte de testes automatizados — validação é manual, sempre com a anten
 - **Race condition healthcheck vs. leitura de TAG**: enviar healthcheck no meio de uma leitura trava o firmware da antena, exige cold restart. Corrigido com `HEALTHCHECK_GUARD_MS` — suprime o healthcheck se dados chegaram recentemente.
 - **`autoheal` com path errado no Windows**: volume do socket Docker precisa ser `//var/run/docker.sock` (barra dupla) no Docker Desktop Windows, não `/var/run/docker.sock`.
 
+- **Processo vivo sem antena e sem reconectar**: uma reconexão que falhava deixava a reconexão marcada como "em andamento" e nada mais era agendado. Corrigido: só o socket atual decide a reconexão (`scheduleReconnect`).
+
+### Recuperação da antena (não reintroduzir reconexão insistente)
+
+Reconectar em sequência, ou o processo reiniciar sozinho, **não** recupera uma antena muda (crise de 10/10/2026 na TAG1); o que recupera é o stop/start do container. Por isso: qualquer comando sem nenhum byte de volta em `COMMAND_RESPONSE_TIMEOUT_MS` derruba a conexão → **uma** reconexão → se ela também não recebe nada, o health responde 503 e o `autoheal` faz stop/start (healthcheck do Docker em 10 s × 2). Uma reconexão basta para o caso comum (antena reiniciou por pico de energia).
+
 Ver `CHANGELOG.md` para o histórico completo com datas e detalhes.
 
 ## Outros serviços do ecossistema
