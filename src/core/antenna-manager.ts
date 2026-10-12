@@ -792,12 +792,14 @@ export class AntennaManager {
    */
   private logTagRead(tagNumber: string, isAuthorized: boolean, verifyData?: AccessVerifyData, reason?: string): void {
     const nome = (verifyData?.NOME || '').toString().trim();
-    const media = (verifyData?.MIDIA || '').toString().trim();
-    const descricao = (verifyData?.DESCRICAO || '').toString().trim();
+    // O ERP numera a classificação ("3 INQUILINO"); no log fica só o nome dela.
+    const descricao = (verifyData?.DESCRICAO || '').toString().trim().replace(/^\d+\s+/, '');
+    // Unidade como apartamento e torre ("123 B"): LOTE é o apartamento, QUADRA a torre.
+    const unidade = [verifyData?.LOTE, verifyData?.QUADRA].map((parte) => (parte ?? '').toString().trim()).filter(Boolean).join(' ');
     const status = isAuthorized ? 'AUTORIZADA' : 'NÃO AUTORIZADA';
-    const detalhes = [media, nome, descricao].filter(Boolean).join(', ');
+    const detalhes = [status, nome, descricao, unidade].filter(Boolean).join(', ');
     const motivo = reason ? ` Motivo: ${reason}` : '';
 
-    logger.info(`[TAG] ${tagNumber} ${status}${detalhes ? ` - ${detalhes}` : ''}${motivo}`);
+    logger.info(`[TAG] ${tagNumber} ${detalhes}${motivo}`);
   }
 }
