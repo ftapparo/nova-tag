@@ -589,6 +589,11 @@ export class AntennaManager {
     }
 
     try {
+      // A v2 (painel da portaria) não registra nada próprio: sem esta linha, a abertura
+      // manual só se distinguia no log por não ter leitura de TAG antes.
+      const detail = autoCloseTime !== undefined ? `${Math.round(autoCloseTime / 1000)} s` : options?.keepOpen ? 'manter aberto' : 'tempo padrão';
+      logger.info(`[API] Abertura manual (portaria/app): ${detail}`);
+
       const wasClosed = gateController.getState() !== ControllerGateState.OPEN;
       // Com o ciclo já aberto pelas leituras, o motor pode ter fechado depois da
       // passagem: o pedido da portaria/app sempre envia o comando de abrir.
@@ -615,6 +620,7 @@ export class AntennaManager {
     }
 
     try {
+      logger.info('[API] Fechamento manual (portaria/app)');
       return await gateController.closeGate();
     } catch (error) {
       logger.error('[AntennaManager] Erro ao fechar portão via rota', { error, antennaId: this.antenna.id });
