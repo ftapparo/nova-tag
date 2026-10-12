@@ -42,6 +42,7 @@ services:
       - TAG_WS_V3_MAX_CLIENTS=${TAG_WS_V3_MAX_CLIENTS:-5}
       - FILTER_DATA=${FILTER_DATA}
       - LOG_TO_FILE=${LOG_TO_FILE}
+      - LOG_MAX_FILES=${LOG_MAX_FILES:-30d}
       - LOG_DIR=${LOG_DIR}
     volumes:
       - C:/Servidor/docker/logs:/app/logs
@@ -105,6 +106,7 @@ services:
       - TAG_WS_V3_MAX_CLIENTS=${TAG_WS_V3_MAX_CLIENTS:-5}
       - FILTER_DATA=${FILTER_DATA}
       - LOG_TO_FILE=${LOG_TO_FILE}
+      - LOG_MAX_FILES=${LOG_MAX_FILES:-30d}
       - LOG_DIR=${LOG_DIR}
     volumes:
       - C:/Servidor/docker/logs:/app/logs

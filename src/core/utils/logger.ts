@@ -60,7 +60,7 @@ if (LOG_TO_FILE) {
       filename: path.join(logDir, "%DATE%.log"),
       datePattern: "YYYY-MM-DD",
       maxSize: "10m",
-      maxFiles: "7d",
+      maxFiles: process.env.LOG_MAX_FILES || "30d",
       level: "debug",
       format: fileFormat,
       zippedArchive: true,
