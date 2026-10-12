@@ -93,6 +93,7 @@ Manual: [`UHF_Prime_Reader.pdf`](UHF_Prime_Reader.pdf) (*UHF Prime Reader User M
 - `0x0076` máscara (fora do manual V1.0; leitura `CFFF00760102AB1B`, mesma configuração do 0x0073 em formato estendido). A antena **ignora dados de máscara todos zero** — o `FILTER_DATA` atual só garante máscara ligada, início 0 e 4 bytes; os dados valendo (`FF FF FF FF`, gravados pelo configurador) barram as TAGs de pedágio. Decisão do usuário: manter o `FILTER_DATA` como está.
 - 🔴 **Nunca enviar `0x0052` (RFM_REBOOT)**: restaura a configuração de fábrica (IP, porta, modo, máscara). Não existe comando de reinício; reiniciar a antena só pela energia.
 - A antena aceita mais de uma conexão TCP ao mesmo tempo (o configurador pode ficar conectado junto com o serviço).
+- A leitura é disparada por um **laço indutivo**: a antena só lê com um veículo sobre o sensor, e então lê **todas** as TAGs no alcance. Na TAG2 (saída, dentro da garagem), a TAG de um carro estacionado de frente para a antena (0000572943) era lida durante a saída dos outros e abria o portão por eles. O RSSI de cada leitura vai para o log para calibrar um filtro por antena; a potência da TAG2 foi reduzida de 28 para 27 dB em 11/10/2026.
 
 ### Recuperação da antena (não reintroduzir reconexão insistente)
 

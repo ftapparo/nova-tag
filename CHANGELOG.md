@@ -4,6 +4,9 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 
 ## [Unreleased]
 
+### Adicionado
+- RSSI de cada leitura de TAG no log (`[READ] TAG <número> (RSSI <valor> dBm)`), para medir a TAG de um carro estacionado no alcance da TAG2 (saída), lida durante a saída de outros veículos: em 05 a 11/10/2026 ela respondeu por 34% das leituras da TAG2, disparou 670 aberturas e 1.199 registros de saída, contra 4 entradas. Base para um filtro por RSSI por antena.
+
 ### Corrigido
 - Leitura dos dados da antena por quadro, conforme o manual (`src/core/antenna-protocol.ts`): os bytes recebidos são acumulados e separados pelo `LEN` de cada quadro, com CRC16 conferido, e interpretados pelo comando e pelo `STATUS`. Antes cada pedaço do TCP era tratado como uma única mensagem identificada pelo prefixo: mensagens grudadas eram perdidas (ex.: confirmação do relé junto com uma leitura), o número da TAG era tirado do fim do pedaço (podia vir da mensagem errada), quadro corrompido virava número de TAG e confirmação de relé com erro era registrada como sucesso. Mensagens desconhecidas e bytes descartados passam a aparecer no log. Leituras da mesma TAG que chegam juntas não validam nem registram a passagem duas vezes.
 - Processo sem antena e sem reconectar: quando uma reconexão falhava (timeout ao conectar), o evento `close` encontrava a reconexão marcada como "em andamento" e não agendava mais nada; o processo seguia vivo sem antena até o autoheal reiniciar o container (crise de 10/10/2026 na TAG1). A reconexão passa a ser decidida só pelo socket atual, com um único agendamento.

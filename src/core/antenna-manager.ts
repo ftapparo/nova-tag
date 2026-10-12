@@ -352,7 +352,10 @@ export class AntennaManager {
           return;
         }
         const tagNumber = "0" + frame.data.subarray(5).toString("hex").slice(-9);
-        logger.debug(`[READ] TAG ${tagNumber}`);
+        // RSSI em 0,1 dBm, com sinal: mede se a TAG estava sob a antena ou longe dela
+        // (ex.: carro estacionado no alcance da TAG2 sendo lido durante a saída de outro).
+        const rssiDbm = frame.data.readInt16BE(0) / 10;
+        logger.debug(`[READ] TAG ${tagNumber} (RSSI ${rssiDbm.toFixed(1)} dBm)`);
         this.handleTagRead(tagNumber, this.antenna.name);
         return;
       }
