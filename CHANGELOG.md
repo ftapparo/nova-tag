@@ -16,6 +16,7 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 - Chamadas à v3 da `nova-api` enviam `x-service-name` com o `TAG_ID` (`tag1`/`tag2`), para o histórico de comandos mostrar qual instância chamou.
 
 ### Alterado
+- Número de TAG com letras (TAG de outro sistema, como pedágio, que passa pela máscara) é registrado como não autorizado sem consultar a API, que sempre respondia 400 para eles (153 erros na semana de 05 a 11/10/2026 nas duas antenas). Nenhuma TAG do condomínio tem letra no número.
 - Recuperação da antena muda: depois de qualquer comando enviado (abrir, fechar, sincronismo, máscara, healthcheck), sem nenhum byte em `COMMAND_RESPONSE_TIMEOUT_MS` (padrão 5000) a conexão é derrubada — vale qualquer byte, não só a confirmação do comando. Após uma queda há **uma** reconexão; se ela também não recebe nada, o processo para de conectar e o health (v2 e v3) responde 503 para o autoheal fazer stop/start do container, que é o que historicamente recupera a antena (reconectar em sequência e o reinício do processo pelo Docker não recuperavam). Sem reinício em 60 s, o processo encerra. Removidos `ATTEMPT_RECONNECT` e o encerramento por número de tentativas.
 - Healthcheck do Docker nas duas instâncias: `interval` 10 s, `timeout` 5 s, `retries` 2 (antes 30 s / 10 s / 3), para o container ser marcado `unhealthy` em ~10–20 s.
 - Retenção dos logs em arquivo de 7 para 30 dias, configurável por `LOG_MAX_FILES` (padrão `30d`).

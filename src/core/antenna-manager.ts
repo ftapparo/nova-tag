@@ -559,6 +559,15 @@ export class AntennaManager {
    * @returns void.
    */
   private async handleTagRead(tagNumber: string, antennaName: string) {
+    // Número com letras é TAG de outro sistema (pedágio) que passou pela máscara:
+    // nenhuma TAG do condomínio tem letra, e a API sempre respondia 400 para elas.
+    if (!/^\d+$/.test(tagNumber)) {
+      const reason = 'Número fora do padrão do condomínio';
+      this.logTagRead(tagNumber, false, undefined, reason);
+      this.emitTagRead(tagNumber, false, reason);
+      return;
+    }
+
     const cachedVerifyData = this.recentAuthorizedTags.get(tagNumber);
     if (cachedVerifyData !== undefined) {
       this.logTagRead(tagNumber, true, cachedVerifyData);
