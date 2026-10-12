@@ -95,6 +95,12 @@ Manual: [`UHF_Prime_Reader.pdf`](UHF_Prime_Reader.pdf) (*UHF Prime Reader User M
 - A antena aceita mais de uma conexão TCP ao mesmo tempo (o configurador pode ficar conectado junto com o serviço).
 - A leitura é disparada por um **laço indutivo**: a antena só lê com um veículo sobre o sensor, e então lê **todas** as TAGs no alcance. Na TAG2 (saída, dentro da garagem), a TAG de um carro estacionado de frente para a antena (0000572943) era lida durante a saída dos outros e abria o portão por eles. O RSSI de cada leitura vai para o log para calibrar um filtro por antena; a potência da TAG2 foi reduzida de 28 para 27 dB em 11/10/2026.
 
+### Passagens, intrusas e gravação no ERP (`core/passage-tracker.ts`)
+
+- **Ciclo** = portão aberto → fechado no software (`GateController`, `onCycleEnd`). A validação na API continua na primeira leitura (decide se abre); a **gravação no ERP acontece no fim do ciclo**, uma por TAG autorizada, com `dataHora` da primeira leitura (campo da v3 da nova-api), sem regravar a mesma TAG em 2 min.
+- **Intrusa** = TAG em dois ciclos seguidos com 60 s–5 min entre as aparições (calibrado com uma semana real: com menos de 60 s, a mesma passagem dividida em dois ciclos marcava carros normais). Marcada em memória até reiniciar, por decisão do usuário (vaga fixa). Com outro veículo no ciclo é ignorada; sozinha, libera na 3ª leitura seguida (`INTRUDER_CONFIRMATIONS`; 5 reduziria ainda mais as aberturas falsas, com ~4 s de espera para o dono). `INTRUDER_DETECTION=false` desliga.
+- **Fila**: TAG nova autorizada com o ciclo aberto reenvia o comando de abrir (o motor fecha após cada passagem).
+
 ### Recuperação da antena (não reintroduzir reconexão insistente)
 
 Reconectar em sequência, ou o processo reiniciar sozinho, **não** recupera uma antena muda (crise de 10/10/2026 na TAG1); o que recupera é o stop/start do container. Por isso: qualquer comando sem nenhum byte de volta em `COMMAND_RESPONSE_TIMEOUT_MS` derruba a conexão → **uma** reconexão → se ela também não recebe nada, o health responde 503 e o `autoheal` faz stop/start (healthcheck do Docker em 10 s × 2). Uma reconexão basta para o caso comum (antena reiniciou por pico de energia).

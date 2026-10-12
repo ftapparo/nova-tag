@@ -96,10 +96,13 @@ async function startService(): Promise<void> {
     }
 
     // Graceful shutdown (Docker / SIGTERM)
-    const shutdown = (signal: string) => {
+    // Antes de sair, termina de gravar no ERP as passagens já confirmadas
+    // (a gravação acontece quando o ciclo do portão fecha).
+    const shutdown = async (signal: string) => {
         console.log(`[Server] Recebido ${signal}, finalizando...`);
         try {
             antennaInstance?.shutdown();
+            await antennaInstance?.waitForRegistrations(3000);
         } finally {
             process.exit(0);
         }

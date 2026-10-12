@@ -1,7 +1,8 @@
 import net from 'net';
 import dotenv from 'dotenv';
 import logger from './utils/logger';
-import { GateController } from './gate-controller';
+import { GateController, GateState as ControllerGateState } from './gate-controller';
+import { PassageTracker } from './passage-tracker';
 import { TagValidator, AccessVerifyData } from './tag-validator';
 import { tagEvents } from './tag-events';
 import { AntennaCmd, AntennaFrame, extractFrames } from './antenna-protocol';
@@ -52,6 +53,17 @@ const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
 // Com a TAG ainda sendo lida, o comando de abrir é reenviado 7 s após o último envio,
 // 3 s antes de o relé soltar sozinho (o relé comanda o semáforo).
 const RELAY_RENEW_AFTER_MS = 7000;
+
+// Intrusas e gravação no ERP (core/passage-tracker.ts). Calibrado com a semana de 05 a
+// 11/10/2026: com 60 s de intervalo mínimo, só as TAGs dos carros estacionados de frente
+// para a antena da TAG2 seriam marcadas — nenhum carro de verdade nas duas antenas (com
+// intervalo menor, a mesma passagem dividida em dois ciclos marcava carros normais).
+const INTRUDER_MIN_GAP_MS = 60_000;
+const INTRUDER_MAX_GAP_MS = 5 * 60_000;
+const INTRUDER_CONFIRMATIONS = 3;          // leituras seguidas da intrusa sozinha (o dono saindo)
+const READ_GAP_MS = 5_000;
+const REGISTRATION_DEDUP_MS = 2 * 60_000;  // mesma passagem dividida em dois ciclos grava uma vez
+const REGISTRATION_FLUSH_MS = 3_000;
 // RFM_RELEASE_CLOSE_RELAY (0x0077), opção 0x01 "release": solta o relé.
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
 // Máscara de leitura (0x0076, fora do manual V1.0; leitura com CFFF00760102AB1B). A antena
@@ -107,6 +119,9 @@ export class AntennaManager {
   public antennaSocket: net.Socket;
   private recentAuthorizedTags: Map<string, AccessVerifyData | undefined> = new Map();
   private validatingTags: Set<string> = new Set();
+  // Vive enquanto o processo vive: intrusa marcada só deixa de ser no reinício.
+  private readonly tracker: PassageTracker;
+  private readonly pendingRegistrations = new Set<Promise<unknown>>();
 
   /**
    * Cria uma instância do gerenciador de antena.
@@ -115,6 +130,14 @@ export class AntennaManager {
   constructor(antenna: AntennaConfig) {
     this.antenna = antenna;
     this.antennaSocket = new net.Socket();
+    this.tracker = new PassageTracker({
+      detectionEnabled: process.env.INTRUDER_DETECTION !== 'false',
+      intruderMinGapMs: INTRUDER_MIN_GAP_MS,
+      intruderMaxGapMs: INTRUDER_MAX_GAP_MS,
+      confirmations: INTRUDER_CONFIRMATIONS,
+      readGapMs: READ_GAP_MS,
+      dedupMs: REGISTRATION_DEDUP_MS,
+    });
   }
 
   /**
@@ -140,6 +163,7 @@ export class AntennaManager {
       antennaId: this.antenna.id,
       onCommandSent: () => this.expectResponse(client),
       relayRenewAfterMs: RELAY_RENEW_AFTER_MS,
+      onCycleEnd: () => this.finishCycle(),
     });
     tagValidator = new TagValidator();
 
@@ -416,8 +440,9 @@ export class AntennaManager {
     antennaUnrecoverable = true;
     logger.issue(`[ERROR] Antena [${this.antenna.ip}] sem resposta após reconexão. Health sinalizando falha para reinício do container`);
 
-    unrecoverableExitTimer = setTimeout(() => {
+    unrecoverableExitTimer = setTimeout(async () => {
       logger.issue(`[ERROR] Container não reiniciado em ${UNRECOVERABLE_EXIT_MS}ms. Encerrando processo`);
+      await this.waitForRegistrations(REGISTRATION_FLUSH_MS);
       process.exit(1);
     }, UNRECOVERABLE_EXIT_MS);
   }
@@ -431,6 +456,9 @@ export class AntennaManager {
       isShuttingDown = true;
       logger.issue("[SHUTDOWN] Encerrando aplicação...");
 
+      // Grava no ERP as passagens do ciclo em andamento; quem encerra o processo
+      // aguarda com waitForRegistrations (a v2 já espera SHUTDOWN_DELAY_MS).
+      this.finishCycle();
       healthCheckWaitResponse = false;
 
       if (reconnectTimer) {
@@ -535,7 +563,14 @@ export class AntennaManager {
     }
 
     try {
-      return await gateController.openGate(autoCloseTime, options);
+      const wasClosed = gateController.getState() === ControllerGateState.CLOSED;
+      const opened = await gateController.openGate(autoCloseTime, options);
+      // Aberto pela portaria/app: há um veículo no laço sem TAG lida, então a
+      // intrusa lida neste ciclo é ignorada como se houvesse outra TAG.
+      if (wasClosed && opened) {
+        this.tracker.startCycle(Date.now(), null);
+      }
+      return opened;
     } catch (error) {
       logger.error('[AntennaManager] Erro ao abrir portão via rota', { error, antennaId: this.antenna.id });
       return false;
@@ -566,6 +601,11 @@ export class AntennaManager {
    * @returns void.
    */
   private async handleTagRead(tagNumber: string, antennaName: string) {
+    // Toda leitura entra no ciclo, inclusive de TAG não autorizada: ela também
+    // indica um veículo no laço, o que faz a intrusa ser ignorada.
+    const readAt = Date.now();
+    const decision = this.tracker.onRead(tagNumber, readAt);
+
     // Número com letras é TAG de outro sistema (pedágio) que passou pela máscara:
     // nenhuma TAG do condomínio tem letra, e a API sempre respondia 400 para elas.
     if (!/^\d+$/.test(tagNumber)) {
@@ -575,11 +615,21 @@ export class AntennaManager {
       return;
     }
 
+    if (decision.action === 'ignore') {
+      logger.debug(`[INTRUSA] TAG ${tagNumber} ignorada: outro veículo no ciclo`);
+      return;
+    }
+    if (decision.action === 'await') {
+      logger.debug(`[INTRUSA] TAG ${tagNumber} lida sozinha ${decision.count}/${INTRUDER_CONFIRMATIONS}: aguardando confirmação`);
+      return;
+    }
+
     const cachedVerifyData = this.recentAuthorizedTags.get(tagNumber);
     if (cachedVerifyData !== undefined) {
       this.logTagRead(tagNumber, true, cachedVerifyData);
       this.emitTagRead(tagNumber, true);
-      gateController.openGate();
+      this.tracker.setAuthorized(tagNumber, cachedVerifyData, readAt);
+      await this.openGateForTag(tagNumber);
       return;
     }
 
@@ -614,8 +664,10 @@ export class AntennaManager {
             this.recentAuthorizedTags.delete(oldest);
           }
         }
-        await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
-        gateController.openGate();
+        // A gravação no ERP acontece quando o ciclo fecha (finishCycle), com a
+        // passagem já confirmada; o portão abre sem esperá-la.
+        this.tracker.setAuthorized(tagNumber, result.verifyData, readAt);
+        await this.openGateForTag(tagNumber);
       } else {
         this.logTagRead(tagNumber, false, result.verifyData, result.reason);
         this.emitTagRead(tagNumber, false, result.reason);
@@ -624,6 +676,65 @@ export class AntennaManager {
     } finally {
       this.validatingTags.delete(tagNumber);
     }
+  }
+
+  /**
+   * Abre o portão para uma TAG autorizada. Com o ciclo já aberto, a primeira
+   * leitura de uma TAG nova (próximo carro da fila) reenvia o comando de abrir:
+   * o motor fecha logo após o carro anterior passar e só reabre com novo comando.
+   * @param tagNumber TAG que pediu a abertura.
+   * @returns void.
+   */
+  private async openGateForTag(tagNumber: string): Promise<void> {
+    const wasClosed = gateController.getState() === ControllerGateState.CLOSED;
+    const forcePulse = !wasClosed && this.tracker.claimControl(tagNumber);
+    const opened = await gateController.openGate(undefined, forcePulse ? { forcePulse: true } : undefined);
+    if (wasClosed && opened) {
+      this.tracker.startCycle(Date.now(), tagNumber);
+    }
+  }
+
+  /**
+   * Fim do ciclo do portão: marca intrusas novas e grava no ERP as passagens
+   * confirmadas, cada uma com o horário da primeira leitura.
+   * @returns void.
+   */
+  private finishCycle(): void {
+    const { registrations, skipped, marked } = this.tracker.endCycle(Date.now());
+
+    for (const { tag, gapMs } of marked) {
+      logger.warn(`[INTRUSA] TAG ${tag} marcada como intrusa: lida em dois ciclos seguidos, ${Math.round(gapMs / 1000)} s entre as aparições. Ignorada com outro veículo até o serviço reiniciar`);
+    }
+    for (const { tag, reason } of skipped) {
+      logger.debug(`[REGISTER] TAG ${tag} não gravada: ${reason}`);
+    }
+
+    const validator = tagValidator;
+    if (!validator || registrations.length === 0) {
+      return;
+    }
+    const accessContext = { device: this.antenna.device, direction: this.antenna.direction, antennaName: this.antenna.name };
+    for (const { tag, verifyData, passedAt } of registrations) {
+      const pending: Promise<unknown> = validator.registerAccess(tag, verifyData, accessContext, passedAt)
+        .catch((error) => logger.error('[AntennaManager] Erro ao gravar passagem', { error, tag }))
+        .finally(() => this.pendingRegistrations.delete(pending));
+      this.pendingRegistrations.add(pending);
+    }
+  }
+
+  /**
+   * Aguarda as gravações no ERP em andamento, com limite de tempo (desligamento).
+   * @param timeoutMs Espera máxima.
+   * @returns Promise resolvida quando terminam ou o tempo acaba.
+   */
+  public async waitForRegistrations(timeoutMs: number): Promise<void> {
+    if (this.pendingRegistrations.size === 0) {
+      return;
+    }
+    await Promise.race([
+      Promise.allSettled([...this.pendingRegistrations]),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
   }
 
   private emitTagRead(tagNumber: string, authorized: boolean, reason?: string): void {

@@ -373,9 +373,11 @@ export class TagValidator {
      * Registra acesso autorizado na API externa
      * @param tag TAG autorizada
      * @param antennaId Identificador da antena
+     * @param passedAt Momento da passagem. A gravação acontece depois que o portão
+     * fecha; sem ele, o ERP registraria o horário da gravação.
      * @returns true se registro bem-sucedido
      */
-    async registerAccess(tag: string, verifyData: AccessVerifyData | undefined, context: AccessContext): Promise<boolean> {
+    async registerAccess(tag: string, verifyData: AccessVerifyData | undefined, context: AccessContext, passedAt?: Date): Promise<boolean> {
         try {
             if (!verifyData) {
                 logger.warn('[TagValidator] Registro ignorado: dados ausentes', {
@@ -402,7 +404,9 @@ export class TagValidator {
                     panico: (verifyData.PANICO || '').toString().trim(),
                     formaAcesso: (verifyData.MIDIA || '').toString().trim(),
                     idAcesso: (verifyData.IDENT || '').toString().trim(),
-                    seqVeiculo: verifyData.SEQVEICULO
+                    seqVeiculo: verifyData.SEQVEICULO,
+                    // Aceito pela v3 da nova-api; a v2 e versões anteriores ignoram o campo.
+                    dataHora: passedAt?.toISOString()
                 },
                 {
                     headers: accessApi.headers,

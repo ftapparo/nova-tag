@@ -23,6 +23,7 @@ export interface GateControllerOptions {
     antennaId: number; // Identificador da antena
     onCommandSent?: () => void; // Chamado a cada comando escrito no socket (a antena deve responder)
     relayRenewAfterMs?: number; // Com o portão aberto, reenvia o comando de abrir após esse tempo do último envio
+    onCycleEnd?: () => void; // Chamado quando o ciclo do portão termina (fechamento ou queda da conexão)
 }
 
 /**
@@ -38,6 +39,7 @@ export class GateController {
     private readonly antennaId: number;
     private readonly onCommandSent?: () => void;
     private readonly relayRenewAfterMs?: number;
+    private readonly onCycleEnd?: () => void;
     private lastOpenCommandAt = 0;
     private keepOpen: boolean = false;
 
@@ -53,6 +55,7 @@ export class GateController {
         this.antennaId = options.antennaId;
         this.onCommandSent = options.onCommandSent;
         this.relayRenewAfterMs = options.relayRenewAfterMs;
+        this.onCycleEnd = options.onCycleEnd;
     }
 
 
@@ -82,7 +85,7 @@ export class GateController {
      * Envia comando para abrir o portão, inicia timer de fechamento automático e atualiza estado
      * @returns Promise<boolean> true se comando enviado com sucesso
      */
-    async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean }): Promise<boolean> {
+    async openGate(autoCloseTime?: number, options?: { keepOpen?: boolean; forcePulse?: boolean }): Promise<boolean> {
         if (options?.keepOpen === true) {
             this.keepOpen = true;
         } else if (options?.keepOpen === false) {
@@ -98,11 +101,16 @@ export class GateController {
             // O relé (que comanda o semáforo) solta sozinho 10 s após o comando de abrir.
             // Com a TAG ainda sendo lida — carro parado na antena —, renova antes disso,
             // para o semáforo não ficar vermelho com o carro na frente do portão aberto.
-            if (this.relayRenewAfterMs !== undefined && Date.now() - this.lastOpenCommandAt >= this.relayRenewAfterMs) {
+            // Veículo novo na fila (forcePulse): o motor fecha logo após o anterior passar,
+            // e só um novo comando o faz abrir de novo — o controle passa para o novo.
+            const renewDue = this.relayRenewAfterMs !== undefined && Date.now() - this.lastOpenCommandAt >= this.relayRenewAfterMs;
+            if (options?.forcePulse || renewDue) {
                 try {
                     this.sendCommand(this.relayOpenCmd);
                     this.lastOpenCommandAt = Date.now();
-                    logger.debug('[GateController] Relé renovado', { antennaId: this.antennaId });
+                    logger.debug(options?.forcePulse
+                        ? '[GateController] Novo veículo no ciclo: comando de abrir reenviado'
+                        : '[GateController] Relé renovado', { antennaId: this.antennaId });
                 } catch (error) {
                     logger.error('[GateController] Erro ao renovar relé', { error, antennaId: this.antennaId });
                     return false;
@@ -166,6 +174,7 @@ export class GateController {
             this.setState(GateState.CLOSING);
             logger.metric('CLOSE_GATE', 1);
             logger.info('[GateController] Portão fechando', { antennaId: this.antennaId });
+            this.onCycleEnd?.();
 
 
             // Após comando, considera fechado após 1s (tempo de resposta do relé)
@@ -196,8 +205,11 @@ export class GateController {
             clearTimeout(this.openTimer);
             this.openTimer = null;
         }
+        const wasOpen = this.state === GateState.OPEN;
         this.keepOpen = false;
         this.state = GateState.CLOSED;
+        // O ciclo termina com a queda: as passagens dele ainda são gravadas no ERP.
+        if (wasOpen) this.onCycleEnd?.();
     }
 
     /**
