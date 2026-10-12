@@ -55,7 +55,9 @@ export class PassageTracker {
     private outsideCycle = new Map<string, TagInCycle>();
     private previousCycle = new Map<string, number>();   // TAG → última leitura no ciclo anterior
     private readonly registeredAt = new Map<string, number>();
-    private aloneTag: string | null = null;
+    // Leituras seguidas de intrusas sem veículo normal no laço. Conta qualquer
+    // intrusa: duas lidas juntas (um dos donos saindo) não podem zerar a
+    // contagem uma da outra e prender o carro.
     private aloneCount = 0;
     private aloneLast = 0;
 
@@ -80,23 +82,18 @@ export class PassageTracker {
         const entry = this.record(tag, now);
 
         if (!this.options.detectionEnabled || !this.intruders.has(tag)) {
-            this.aloneTag = null;   // outro veículo no laço: a sequência da intrusa recomeça
+            this.aloneCount = 0;   // veículo normal no laço: a sequência das intrusas recomeça
             return { action: 'process' };
         }
         if (this.otherVehiclePresent(now)) {
-            this.aloneTag = null;
+            this.aloneCount = 0;
             return { action: 'ignore' };
         }
         if (entry.acceptedAlone) {
             return { action: 'process' };
         }
 
-        if (this.aloneTag === tag && now - this.aloneLast < this.options.readGapMs) {
-            this.aloneCount++;
-        } else {
-            this.aloneTag = tag;
-            this.aloneCount = 1;
-        }
+        this.aloneCount = now - this.aloneLast < this.options.readGapMs ? this.aloneCount + 1 : 1;
         this.aloneLast = now;
 
         if (this.aloneCount < this.options.confirmations) {
