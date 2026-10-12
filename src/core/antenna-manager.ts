@@ -81,11 +81,18 @@ let responseTimer: NodeJS.Timeout | null = null;
 let unrecoverableExitTimer: NodeJS.Timeout | null = null;
 let isShuttingDown = false;
 let receivedSinceConnect = false;    // a conexão atual já recebeu algum byte da antena
+let connectedThisAttempt = false;    // a tentativa atual chegou a abrir a conexão TCP
+let unreachableSince: number | null = null;  // desde quando as tentativas nem conectam
 let isRetryConnection = false;       // a conexão atual é a reconexão única após uma queda
 let antennaUnrecoverable = false;    // a reconexão também não recebeu nada: aguarda o reinício do container
 
 const RECONNECT_DELAY_MS = 3000;
 const UNRECOVERABLE_EXIT_MS = 60000;
+// Antena que não aceita conexão está desligada ou ligando (pico de energia): reiniciar
+// o container não adianta, então insiste por este tempo antes de sinalizar falha.
+const UNREACHABLE_LIMIT_MS = 30000;
+// A nova-api aceita o horário da passagem até 10 min atrás; acima disso grava sem ele.
+const PASSED_AT_MAX_AGE_MS = 9 * 60_000;
 
 // Lida no uso, não no topo: imports resolvem antes do dotenv.config() do server.
 const resolveCommandResponseTimeoutMs = (): number => Number(process.env.COMMAND_RESPONSE_TIMEOUT_MS) || 5000;
@@ -153,6 +160,7 @@ export class AntennaManager {
     const client = new net.Socket();
     this.antennaSocket = client;
     receivedSinceConnect = false;
+    connectedThisAttempt = false;
 
     // Reatribui instâncias globais se necessário
     gateController = new GateController({
@@ -180,6 +188,8 @@ export class AntennaManager {
     // Evento da conexão do socket
     client.connect(this.antenna.port, this.antenna.ip, () => {
       client.removeListener("timeout", onConnectTimeout);
+      connectedThisAttempt = true;
+      unreachableSince = null;
 
       // Reset de variáveis de estado ao conectar
       healthCheckWaitResponse = false;  //indica que não está esperando resposta do healthcheck
@@ -309,10 +319,25 @@ export class AntennaManager {
         closeGateTimeout = null;
       }
 
-      // Uma reconexão recupera a antena que reiniciou (pico de energia). Quando nem
-      // ela recebe resposta, insistir não adianta: na crise de 10/10/2026 a antena
-      // seguiu muda em reconexões a cada poucos segundos, inclusive após o processo
-      // reiniciar sozinho, e só voltou com stop/start do container.
+      // Antena que nem aceita a conexão (recusada ou sem resposta ao conectar) está
+      // desligada ou ligando: tenta de novo a cada 3 s, sem gastar a reconexão única,
+      // até UNREACHABLE_LIMIT_MS — uma antena que reinicia num pico de energia leva
+      // mais que 3 s para voltar.
+      if (!connectedThisAttempt) {
+        unreachableSince ??= Date.now();
+        if (Date.now() - unreachableSince < UNREACHABLE_LIMIT_MS) {
+          logger.warn(`[DISCONNECTED] Antena [${this.antenna.ip}] não aceitou a conexão. Nova tentativa em ${RECONNECT_DELAY_MS}ms`);
+          this.scheduleReconnect(RECONNECT_DELAY_MS, isRetryConnection);
+          return;
+        }
+        this.markUnrecoverable();
+        return;
+      }
+
+      // Uma reconexão recupera a antena que reiniciou (pico de energia). Quando ela
+      // conecta e mesmo assim fica muda, insistir não adianta: na crise de 10/10/2026
+      // a antena seguiu muda em reconexões a cada poucos segundos, inclusive após o
+      // processo reiniciar sozinho, e só voltou com stop/start do container.
       if (!receivedSinceConnect && isRetryConnection) {
         this.markUnrecoverable();
         return;
@@ -495,6 +520,7 @@ export class AntennaManager {
       healthCheckWaitResponse = false;
       antennaUnrecoverable = false;
       isRetryConnection = false;
+      unreachableSince = null;
       if (unrecoverableExitTimer) {
         clearTimeout(unrecoverableExitTimer);
         unrecoverableExitTimer = null;
@@ -564,7 +590,9 @@ export class AntennaManager {
 
     try {
       const wasClosed = gateController.getState() === ControllerGateState.CLOSED;
-      const opened = await gateController.openGate(autoCloseTime, options);
+      // Com o ciclo já aberto pelas leituras, o motor pode ter fechado depois da
+      // passagem: o pedido da portaria/app sempre envia o comando de abrir.
+      const opened = await gateController.openGate(autoCloseTime, { ...options, forcePulse: !wasClosed });
       // Aberto pela portaria/app: há um veículo no laço sem TAG lida, então a
       // intrusa lida neste ciclo é ignorada como se houvesse outra TAG.
       if (wasClosed && opened) {
@@ -715,7 +743,13 @@ export class AntennaManager {
     }
     const accessContext = { device: this.antenna.device, direction: this.antenna.direction, antennaName: this.antenna.name };
     for (const { tag, verifyData, passedAt } of registrations) {
-      const pending: Promise<unknown> = validator.registerAccess(tag, verifyData, accessContext, passedAt)
+      // Ciclo muito longo (carro parado no laço): a nova-api recusaria o horário
+      // antigo e a passagem se perderia; sem ele, vale o horário da gravação.
+      const tooOld = Date.now() - passedAt.getTime() > PASSED_AT_MAX_AGE_MS;
+      if (tooOld) {
+        logger.warn(`[REGISTER] TAG ${tag}: passagem de ${passedAt.toISOString()} gravada com o horário atual (ciclo longo demais)`);
+      }
+      const pending: Promise<unknown> = validator.registerAccess(tag, verifyData, accessContext, tooOld ? undefined : passedAt)
         .catch((error) => logger.error('[AntennaManager] Erro ao gravar passagem', { error, tag }))
         .finally(() => this.pendingRegistrations.delete(pending));
       this.pendingRegistrations.add(pending);

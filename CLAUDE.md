@@ -105,7 +105,9 @@ Manual: [`UHF_Prime_Reader.pdf`](UHF_Prime_Reader.pdf) (*UHF Prime Reader User M
 
 ### Recuperação da antena (não reintroduzir reconexão insistente)
 
-Reconectar em sequência, ou o processo reiniciar sozinho, **não** recupera uma antena muda (crise de 10/10/2026 na TAG1); o que recupera é o stop/start do container. Por isso: qualquer comando sem nenhum byte de volta em `COMMAND_RESPONSE_TIMEOUT_MS` derruba a conexão → **uma** reconexão → se ela também não recebe nada, o health responde 503 e o `autoheal` faz stop/start (healthcheck do Docker em 10 s × 2). Uma reconexão basta para o caso comum (antena reiniciou por pico de energia).
+Reconectar em sequência, ou o processo reiniciar sozinho, **não** recupera uma antena muda (crise de 10/10/2026 na TAG1); o que recupera é o stop/start do container. Por isso: qualquer comando sem nenhum byte de volta em `COMMAND_RESPONSE_TIMEOUT_MS` derruba a conexão → **uma** reconexão → se ela também não recebe nada, o health responde 503 e o `autoheal` faz stop/start (healthcheck do Docker em 10 s × 2). Uma reconexão basta para o caso comum (antena reiniciou por pico de energia). A reconexão única só é gasta quando a antena **conecta e fica muda**; se ela **nem aceita a conexão** (desligada ou ainda ligando), tenta a cada 3 s por até 30 s antes do 503 — reiniciar o container não adianta para antena desligada.
+
+Teste de integração (fora do repositório): o código compilado roda contra uma antena falsa em 127.0.0.1 e com o axios substituído no próprio processo — nunca contra a antena ou a nova-api reais.
 
 Ver `CHANGELOG.md` para o histórico completo com datas e detalhes.
 

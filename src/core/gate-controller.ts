@@ -107,15 +107,15 @@ export class GateController {
             // O relé (que comanda o semáforo) solta sozinho 10 s após o comando de abrir.
             // Com a TAG ainda sendo lida — carro parado na antena —, renova antes disso,
             // para o semáforo não ficar vermelho com o carro na frente do portão aberto.
-            // Veículo novo na fila (forcePulse): o motor fecha logo após o anterior passar,
-            // e só um novo comando o faz abrir de novo — o controle passa para o novo.
+            // Veículo novo na fila ou pedido da portaria/app (forcePulse): o motor fecha logo
+            // após o veículo anterior passar, e só um novo comando o faz abrir de novo.
             const renewDue = this.relayRenewAfterMs !== undefined && Date.now() - this.lastOpenCommandAt >= this.relayRenewAfterMs;
             if (options?.forcePulse || renewDue) {
                 try {
                     this.sendCommand(this.relayOpenCmd);
                     this.lastOpenCommandAt = Date.now();
                     logger.debug(options?.forcePulse
-                        ? '[GateController] Novo veículo no ciclo: comando de abrir reenviado'
+                        ? '[GateController] Comando de abrir reenviado (novo veículo ou portaria)'
                         : '[GateController] Relé renovado', { antennaId: this.antennaId });
                 } catch (error) {
                     logger.error('[GateController] Erro ao renovar relé', { error, antennaId: this.antennaId });
