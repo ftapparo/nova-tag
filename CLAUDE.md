@@ -83,6 +83,16 @@ Sem suíte de testes automatizados — validação é manual, sempre com a anten
 
 - **Processo vivo sem antena e sem reconectar**: uma reconexão que falhava deixava a reconexão marcada como "em andamento" e nada mais era agendado. Corrigido: só o socket atual decide a reconexão (`scheduleReconnect`).
 
+### Protocolo da antena (UHF Prime Reader)
+
+Manual: *UHF Prime Reader User Manual V1.0* (pedir ao usuário; não está versionado). Quadro: `CF | ADDR | CMD (2) | LEN | STATUS + Data | CRC16` — separado e validado em `core/antenna-protocol.ts`, nunca por prefixo de texto.
+
+- `0x0050` RFM_MODULE_INT: healthcheck (verificação de antena online, resposta mais curta).
+- `0x0077` relé: opção `0x02` aciona por ValidTime (10 s, o hardware solta sozinho); `0x01` solta.
+- `0x0076` máscara (fora do manual V1.0; leitura `CFFF00760102AB1B`, mesma configuração do 0x0073 em formato estendido). A antena **ignora dados de máscara todos zero** — o `FILTER_DATA` atual só garante máscara ligada, início 0 e 4 bytes; os dados valendo (`FF FF FF FF`, gravados pelo configurador) barram as TAGs de pedágio. Decisão do usuário: manter o `FILTER_DATA` como está.
+- 🔴 **Nunca enviar `0x0052` (RFM_REBOOT)**: restaura a configuração de fábrica (IP, porta, modo, máscara). Não existe comando de reinício; reiniciar a antena só pela energia.
+- A antena aceita mais de uma conexão TCP ao mesmo tempo (o configurador pode ficar conectado junto com o serviço).
+
 ### Recuperação da antena (não reintroduzir reconexão insistente)
 
 Reconectar em sequência, ou o processo reiniciar sozinho, **não** recupera uma antena muda (crise de 10/10/2026 na TAG1); o que recupera é o stop/start do container. Por isso: qualquer comando sem nenhum byte de volta em `COMMAND_RESPONSE_TIMEOUT_MS` derruba a conexão → **uma** reconexão → se ela também não recebe nada, o health responde 503 e o `autoheal` faz stop/start (healthcheck do Docker em 10 s × 2). Uma reconexão basta para o caso comum (antena reiniciou por pico de energia).

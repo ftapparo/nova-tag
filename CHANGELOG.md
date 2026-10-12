@@ -5,6 +5,7 @@ Todas as mudanças neste projeto são documentadas neste arquivo.
 ## [Unreleased]
 
 ### Corrigido
+- Leitura dos dados da antena por quadro, conforme o manual (`src/core/antenna-protocol.ts`): os bytes recebidos são acumulados e separados pelo `LEN` de cada quadro, com CRC16 conferido, e interpretados pelo comando e pelo `STATUS`. Antes cada pedaço do TCP era tratado como uma única mensagem identificada pelo prefixo: mensagens grudadas eram perdidas (ex.: confirmação do relé junto com uma leitura), o número da TAG era tirado do fim do pedaço (podia vir da mensagem errada), quadro corrompido virava número de TAG e confirmação de relé com erro era registrada como sucesso. Mensagens desconhecidas e bytes descartados passam a aparecer no log. Leituras da mesma TAG que chegam juntas não validam nem registram a passagem duas vezes.
 - Processo sem antena e sem reconectar: quando uma reconexão falhava (timeout ao conectar), o evento `close` encontrava a reconexão marcada como "em andamento" e não agendava mais nada; o processo seguia vivo sem antena até o autoheal reiniciar o container (crise de 10/10/2026 na TAG1). A reconexão passa a ser decidida só pelo socket atual, com um único agendamento.
 - Timeout de conexão disparava também o handler de inatividade, que podia tentar enviar healthcheck num socket destruído e derrubar o processo por exceção.
 - O temporizador de 3 s do healthcheck podia derrubar uma reconexão mais nova; agora derruba só o socket que enviou o healthcheck.

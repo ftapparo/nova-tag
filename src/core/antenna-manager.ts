@@ -4,6 +4,7 @@ import logger from './utils/logger';
 import { GateController } from './gate-controller';
 import { TagValidator, AccessVerifyData } from './tag-validator';
 import { tagEvents } from './tag-events';
+import { AntennaCmd, AntennaFrame, extractFrames } from './antenna-protocol';
 
 /**
  * Configuração de conexão e operação da antena RFID.
@@ -40,9 +41,19 @@ const HEALTHCHECK_ENABLED = process.env.HEALTHCHECK_ENABLED !== 'false';
 const CONNECT_TIMEOUT_MS = Number(process.env.CONNECT_TIMEOUT_MS) || 10000;
 const GATE_TIMEOUT_TO_CLOSE = Number(process.env.GATE_TIMEOUT_TO_CLOSE) || 5000;
 const RECENT_AUTHORIZED_LIMIT = Number(process.env.RECENT_AUTHORIZED_LIMIT) || 3;
+// Comandos da antena (UHF Prime Reader User Manual V1.0). Nunca enviar o 0x0052
+// (RFM_REBOOT): apesar do nome, restaura a configuração de fábrica (IP, porta,
+// modo de trabalho, máscara). A antena não tem comando de reinício.
+// RFM_MODULE_INT (0x0050): verificação de antena online indicada pelo manual, a de resposta mais curta.
 const HEALTHCHECK_CMD = Buffer.from("CFFF0050000726", "hex");
+// RFM_RELEASE_CLOSE_RELAY (0x0077), opção 0x02 "close": aciona o relé por ValidTime = 10 s;
+// depois o próprio hardware solta o relé, mesmo se a conexão cair.
 const RELAY_OPEN_CMD = Buffer.from("CFFF007702020AF27C", "hex");
+// RFM_RELEASE_CLOSE_RELAY (0x0077), opção 0x01 "release": solta o relé.
 const RELAY_CLOSE_CMD = Buffer.from("CFFF0077020100774E", "hex");
+// Máscara de leitura (0x0076, fora do manual V1.0; leitura com CFFF00760102AB1B). A antena
+// ignora dados de máscara todos zero, como os do FILTER_DATA atual, e mantém os gravados
+// pelo configurador (FF FF FF FF): o envio só garante máscara ligada, início 0 e 4 bytes.
 const FILTER_CMD = Buffer.from(String(process.env.FILTER_DATA) || "", "hex");
 
 // Variáveis de controle do estado da aplicação
@@ -92,6 +103,7 @@ export class AntennaManager {
   public antenna: AntennaConfig;
   public antennaSocket: net.Socket;
   private recentAuthorizedTags: Map<string, AccessVerifyData | undefined> = new Map();
+  private validatingTags: Set<string> = new Set();
 
   /**
    * Cria uma instância do gerenciador de antena.
@@ -170,9 +182,11 @@ export class AntennaManager {
     });
 
     // Evento ao receber dados do socket
-    client.on("data", async (data) => {
+    // Bytes de um quadro que ainda não chegou inteiro (por conexão)
+    let pendingBytes: Buffer = Buffer.alloc(0);
 
-      const hexData = data.toString("hex");   // Converte os dados recebidos para hexadecimal
+    client.on("data", (data) => {
+
       receivedSinceConnect = true;            // A antena respondeu nesta conexão
       if (responseTimer) {                    // Qualquer byte atende o comando que aguardava resposta
         clearTimeout(responseTimer);
@@ -181,55 +195,14 @@ export class AntennaManager {
       healthCheckWaitResponse = false;        // Reseta o estado de espera por resposta do healthcheck
       lastDataTimestamp = Date.now();         // Registra o momento do último dado recebido
 
-      //logger.debug(`Mensagem: ${hexData}`);
+      const { frames, discarded, rest } = extractFrames(Buffer.concat([pendingBytes, data]));
+      pendingBytes = rest;
 
-      // Resposta de HealthCheck
-      if (hexData.startsWith("cf000050")) {
-        logger.debug(`[HEALTHCHECK] Conexão estável, aguardando nova leitura`);
-        return;
+      for (const bytes of discarded) {
+        logger.warn(`[FRAME] Bytes descartados (fora de quadro ou CRC inválido): ${bytes.toString('hex')}`);
       }
-
-      // Resposta de comando de configuração de filtro
-      else if (hexData.startsWith("cf000076")) {
-        if (hexData.startsWith("cf000076020001")) {
-          logger.debug("[MASK] Filtro por máscara configurado com sucesso");
-
-        }
-        else {
-          logger.error("[ERROR] Falha ao configurar filtro por máscara");
-          setImmediate(() => this.antennaSocket.destroy());
-        }
-        return;
-      }
-
-      // Resposta de comando de fechamento
-      else if (hexData.startsWith("cf000077020001")) {
-        logger.debug(`[STATE] Portão fechado`);
-        logger.counter("CLOSE_GATE");   // Incrementa o contador de abertura de portão
-        gateState = GateState.CLOSED;
-        return;
-      }
-
-      // Resposta de comando de abertura
-      else if (hexData.startsWith("cf00007703")) {
-        logger.debug(`[STATE] Portão aberto`);
-        return;
-      }
-
-      // Leitura de TAG detectada
-      else if (hexData.startsWith("cf00000112")) {
-        const tagNumber = "0" + hexData.slice(-13, -4);   // Extrai o número da TAG do dado recebido
-        logger.debug(`[READ] TAG ${tagNumber}`);
-
-        //logger.debug(`[READ]  ${hexData}`);
-
-        this.handleTagRead(tagNumber, this.antenna.name);
-        return;
-      }
-
-      // Mensagem diferente do esperado
-      else {
-        //logger.debug(`[UNKNOWN] Mensagem desconhecida: ${hexData}`);
+      for (const frame of frames) {
+        this.handleFrame(client, frame);
       }
     });
 
@@ -327,6 +300,63 @@ export class AntennaManager {
       logger.issue(`[ERROR] Antena [${this.antenna.ip}]: ${err.message}`);
       client.destroy();
     });
+  }
+
+  /**
+   * Interpreta um quadro já validado pelo CRC, pelo comando e pelo STATUS.
+   * @param client Socket que recebeu o quadro.
+   * @param frame Quadro recebido da antena.
+   * @returns void.
+   */
+  private handleFrame(client: net.Socket, frame: AntennaFrame) {
+    switch (frame.cmd) {
+      // Resposta de HealthCheck
+      case AntennaCmd.MODULE_INT:
+        logger.debug(`[HEALTHCHECK] Conexão estável, aguardando nova leitura`);
+        return;
+
+      // Resposta de comando de configuração de filtro
+      case AntennaCmd.MASK:
+        if (frame.status === 0) {
+          logger.debug("[MASK] Filtro por máscara configurado com sucesso");
+        } else {
+          logger.error(`[ERROR] Falha ao configurar filtro por máscara (status ${frame.status})`);
+          setImmediate(() => client.destroy());
+        }
+        return;
+
+      // Resposta do relé: Data[0] é a opção do comando (0x01 soltou, 0x02 acionou)
+      case AntennaCmd.RELAY:
+        if (frame.status !== 0) {
+          logger.error(`[ERROR] Antena recusou comando do relé (status ${frame.status}): ${frame.raw.toString('hex')}`);
+        } else if (frame.data[0] === 0x01) {
+          logger.debug(`[STATE] Portão fechado`);
+          logger.counter("CLOSE_GATE");   // Incrementa o contador de abertura de portão
+          gateState = GateState.CLOSED;
+        } else if (frame.data[0] === 0x02) {
+          logger.debug(`[STATE] Portão aberto`);
+        }
+        return;
+
+      // Leitura de TAG (modo ativo): Data[] = RSSI (2) | antena | canal | tamanho do EPC | EPC.
+      // Só EPC de 12 bytes, como sempre: o número da TAG são os 9 últimos dígitos
+      // hexadecimais do EPC, com um "0" na frente.
+      case AntennaCmd.TAG_READ: {
+        const epcLength = frame.data[4];
+        if (frame.status !== 0 || epcLength !== 12 || frame.data.length !== 5 + epcLength) {
+          logger.debug(`[READ] Quadro de leitura ignorado: ${frame.raw.toString('hex')}`);
+          return;
+        }
+        const tagNumber = "0" + frame.data.subarray(5).toString("hex").slice(-9);
+        logger.debug(`[READ] TAG ${tagNumber}`);
+        this.handleTagRead(tagNumber, this.antenna.name);
+        return;
+      }
+
+      // Mensagem diferente do esperado
+      default:
+        logger.debug(`[UNKNOWN] Mensagem desconhecida: ${frame.raw.toString('hex')}`);
+    }
   }
 
   /**
@@ -548,24 +578,35 @@ export class AntennaManager {
       return;
     }
 
-    const result = await tagValidator.validateTag(tagNumber, accessContext);
-    if (result.isValid) {
-      this.logTagRead(tagNumber, true, result.verifyData);
-      this.emitTagRead(tagNumber, true);
-      logger.counter('AUTHORIZED');
-      this.recentAuthorizedTags.set(tagNumber, result.verifyData);
-      if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
-        const oldest = this.recentAuthorizedTags.keys().next().value;
-        if (typeof oldest === 'string') {
-          this.recentAuthorizedTags.delete(oldest);
+    // Com os quadros tratados um a um, duas leituras da mesma TAG no mesmo pacote
+    // TCP chegam juntas; sem esta trava, a passagem seria validada e registrada duas vezes.
+    if (this.validatingTags.has(tagNumber)) {
+      return;
+    }
+    this.validatingTags.add(tagNumber);
+
+    try {
+      const result = await tagValidator.validateTag(tagNumber, accessContext);
+      if (result.isValid) {
+        this.logTagRead(tagNumber, true, result.verifyData);
+        this.emitTagRead(tagNumber, true);
+        logger.counter('AUTHORIZED');
+        this.recentAuthorizedTags.set(tagNumber, result.verifyData);
+        if (this.recentAuthorizedTags.size > RECENT_AUTHORIZED_LIMIT) {
+          const oldest = this.recentAuthorizedTags.keys().next().value;
+          if (typeof oldest === 'string') {
+            this.recentAuthorizedTags.delete(oldest);
+          }
         }
+        await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
+        gateController.openGate();
+      } else {
+        this.logTagRead(tagNumber, false, result.verifyData, result.reason);
+        this.emitTagRead(tagNumber, false, result.reason);
+        logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
       }
-      await tagValidator.registerAccess(tagNumber, result.verifyData, accessContext);
-      gateController.openGate();
-    } else {
-      this.logTagRead(tagNumber, false, result.verifyData, result.reason);
-      this.emitTagRead(tagNumber, false, result.reason);
-      logger.warn(`[UNAUTHORIZED] TAG ${tagNumber} não autorizada: ${result.reason}`);
+    } finally {
+      this.validatingTags.delete(tagNumber);
     }
   }
 
