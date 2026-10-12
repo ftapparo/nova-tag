@@ -589,7 +589,7 @@ export class AntennaManager {
     }
 
     try {
-      const wasClosed = gateController.getState() === ControllerGateState.CLOSED;
+      const wasClosed = gateController.getState() !== ControllerGateState.OPEN;
       // Com o ciclo já aberto pelas leituras, o motor pode ter fechado depois da
       // passagem: o pedido da portaria/app sempre envia o comando de abrir.
       const opened = await gateController.openGate(autoCloseTime, { ...options, forcePulse: !wasClosed });
@@ -714,7 +714,9 @@ export class AntennaManager {
    * @returns void.
    */
   private async openGateForTag(tagNumber: string): Promise<void> {
-    const wasClosed = gateController.getState() === ControllerGateState.CLOSED;
+    // "Fechando" conta como fechado: o GateController reabre e começa um ciclo novo
+    // (o anterior já foi gravado no fechamento).
+    const wasClosed = gateController.getState() !== ControllerGateState.OPEN;
     const forcePulse = !wasClosed && this.tracker.claimControl(tagNumber);
     const opened = await gateController.openGate(undefined, { fromTag: true, forcePulse });
     if (wasClosed && opened) {

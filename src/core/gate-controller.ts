@@ -32,6 +32,7 @@ export interface GateControllerOptions {
 export class GateController {
     private state: GateState = GateState.CLOSED;
     private openTimer: NodeJS.Timeout | null = null;
+    private closingTimer: NodeJS.Timeout | null = null;
     private readonly relayOpenCmd: Buffer;
     private readonly relayCloseCmd: Buffer;
     private readonly socket: net.Socket;
@@ -136,6 +137,18 @@ export class GateController {
             return true;
         }
 
+        // Pedido de abrir no 1 s de "fechando" (leitura logo após o comando de soltar):
+        // antes era recusado e o pedido se perdia (31 vezes em 12/10/2026 na TAG2, 9 sem
+        // nova leitura depois). Agora cancela o fechamento e abre de novo, como se fechado.
+        if (this.state === GateState.CLOSING) {
+            if (this.closingTimer) {
+                clearTimeout(this.closingTimer);
+                this.closingTimer = null;
+            }
+            this.state = GateState.CLOSED;
+            logger.info('[GateController] Pedido de abrir durante o fechamento: reabrindo', { antennaId: this.antennaId });
+        }
+
         if (this.state !== GateState.CLOSED) {
             logger.warn('[GateController] Tentativa de abrir portão já em estado', { state: this.state, antennaId: this.antennaId });
             return false;
@@ -184,7 +197,8 @@ export class GateController {
 
 
             // Após comando, considera fechado após 1s (tempo de resposta do relé)
-            setTimeout(() => {
+            this.closingTimer = setTimeout(() => {
+                this.closingTimer = null;
                 this.setState(GateState.CLOSED);
                 logger.info('[GateController] Portão fechado', { antennaId: this.antennaId });
             }, 1000);
@@ -210,6 +224,10 @@ export class GateController {
         if (this.openTimer) {
             clearTimeout(this.openTimer);
             this.openTimer = null;
+        }
+        if (this.closingTimer) {
+            clearTimeout(this.closingTimer);
+            this.closingTimer = null;
         }
         const wasOpen = this.state === GateState.OPEN;
         this.keepOpen = false;
