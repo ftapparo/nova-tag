@@ -10,7 +10,7 @@
     "type": "git",
     "url": "git+https://github.com/ftapparo/nova-tag.git"
   },
-  "license": "MIT",
+  "license": "UNLICENSED",
   "author": "Flavio Eduardo Tapparo",
   "type": "commonjs",
   "main": "server.js",
